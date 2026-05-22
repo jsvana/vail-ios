@@ -9,19 +9,43 @@ struct RosterView: View {
     var body: some View {
         List {
             Section {
-                if session.users.isEmpty {
+                if dedupedUsers.isEmpty {
                     Text("No users connected")
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(session.users, id: \.callsign) { user in
+                    ForEach(dedupedUsers, id: \.callsign) { user in
                         UserRow(user: user, isMe: user.callsign == session.callsign)
                     }
                 }
             } header: {
-                Text("Connected (\(session.users.count))")
+                Text("Connected (\(dedupedUsers.count))")
             }
         }
         .navigationTitle("Roster")
+    }
+
+    /// Server reports per-socket, so the same callsign can appear multiple
+    /// times during reconnect overlap or genuine multi-device login. Collapse
+    /// by callsign, preferring an entry that advertises a non-zero TX tone.
+    private var dedupedUsers: [VailMessage.UserInfo] {
+        var byCallsign: [String: VailMessage.UserInfo] = [:]
+        for user in session.users {
+            if let existing = byCallsign[user.callsign] {
+                let existingTone = existing.txTone ?? 0
+                let newTone = user.txTone ?? 0
+                if existingTone == 0, newTone > 0 {
+                    byCallsign[user.callsign] = user
+                }
+            } else {
+                byCallsign[user.callsign] = user
+            }
+        }
+        let myCallsign = session.callsign
+        return byCallsign.values.sorted { lhs, rhs in
+            if lhs.callsign == myCallsign { return true }
+            if rhs.callsign == myCallsign { return false }
+            return lhs.callsign < rhs.callsign
+        }
     }
 }
 

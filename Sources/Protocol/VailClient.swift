@@ -38,6 +38,11 @@ public actor VailClient {
 
     // MARK: - Internal state
 
+    /// Single URLSession reused across reconnects. Creating a new URLSession per
+    /// openSocket() left old sessions alive in memory and could leave their
+    /// websocket tasks half-open on the server until ARC collected them —
+    /// resulting in the same callsign appearing multiple times in roster.
+    private let urlSession = URLSession(configuration: .default)
     private var task: URLSessionWebSocketTask?
     private var sent: [VailMessage] = []
     private var receiveTask: Task<Void, Never>?
@@ -118,7 +123,7 @@ public actor VailClient {
         openSocket()
     }
 
-    public func disconnect() {
+    public func disconnect() async {
         wantConnected = false
         keepaliveTask?.cancel()
         keepaliveTask = nil
@@ -126,6 +131,10 @@ public actor VailClient {
         receiveTask = nil
         task?.cancel(with: .normalClosure, reason: nil)
         task = nil
+        // Brief pause to let the close frame propagate before any subsequent
+        // reconnect creates a new socket. Without this the server may briefly
+        // see both the old and new socket for the same callsign.
+        try? await Task.sleep(for: .milliseconds(250))
         eventContinuation.yield(.stateChanged(.disconnected))
     }
 
@@ -212,6 +221,16 @@ public actor VailClient {
             return
         }
 
+        // Explicitly cancel any prior socket and its loops before opening a
+        // new one. Without this a fast-reconnect path can leave the previous
+        // task in memory long enough for the server to list us twice.
+        task?.cancel(with: .goingAway, reason: nil)
+        task = nil
+        receiveTask?.cancel()
+        receiveTask = nil
+        keepaliveTask?.cancel()
+        keepaliveTask = nil
+
         eventContinuation.yield(.stateChanged(.connecting))
 
         var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)!
@@ -225,8 +244,7 @@ public actor VailClient {
         // via the protocols: argument.
         clockOffsetMs = 0
         sent.removeAll()
-        let session = URLSession(configuration: .default)
-        let newTask = session.webSocketTask(with: url, protocols: [Self.subprotocol])
+        let newTask = urlSession.webSocketTask(with: url, protocols: [Self.subprotocol])
         task = newTask
         newTask.resume()
 
