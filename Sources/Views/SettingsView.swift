@@ -8,6 +8,7 @@ struct SettingsView: View {
     @State private var callsignField: String = ""
     @State private var txToneField: Double = 72
     @State private var rxDelayField: Double = 2000
+    @FocusState private var callsignFocused: Bool
 
     var body: some View {
         Form {
@@ -19,6 +20,8 @@ struct SettingsView: View {
                         .textInputAutocapitalization(.characters)
                         .autocorrectionDisabled()
                         .multilineTextAlignment(.trailing)
+                        .focused($callsignFocused)
+                        .submitLabel(.done)
                         .onSubmit { commitCallsign() }
                 }
                 Button("Apply callsign") { commitCallsign() }
@@ -68,6 +71,13 @@ struct SettingsView: View {
             }
         }
         .navigationTitle("Settings")
+        .scrollDismissesKeyboard(.interactively)
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") { callsignFocused = false }
+            }
+        }
         .onAppear {
             callsignField = session.callsign
             txToneField = Double(session.txTone)
@@ -77,6 +87,7 @@ struct SettingsView: View {
 
     private func commitCallsign() {
         session.setCallsign(callsignField)
+        callsignFocused = false
     }
 
     private var stateText: String {

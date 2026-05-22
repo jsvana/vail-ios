@@ -391,8 +391,11 @@ These are not in v1 but the architecture has space for them:
   client's `decoder.mjs`).
 - **MIDI output to adapter** (RX feedback): port `MIDIBuzzer` from
   `outputs.mjs`. CoreMIDI output port to adapter's input.
-- **Settings persistence**: `UserDefaults` for callsign, RX delay, TX tone,
-  WPM, sidetone preference. Currently in `VailSession` as in-memory state.
+- **Settings persistence**: `UserDefaults` keys `VailSession.callsign`,
+  `VailSession.channel`, `VailSession.txTone`, `VailSession.rxDelayMs`,
+  `VailSession.breakInEnabled` are persisted via `didSet` observers on the
+  `@Published` properties. WPM and sidetone preference are still deferred —
+  no UI surface yet.
 - **BLE MIDI pairing UI**: `CABTMIDICentralViewController` wrapped for
   SwiftUI. CoreMIDI sees BLE devices automatically once paired.
 - **Background audio entitlement**: requires explicit Info.plist key + UI

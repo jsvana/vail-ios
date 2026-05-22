@@ -22,15 +22,25 @@ public final class VailSession: ObservableObject {
     // MARK: - Published state
 
     @Published public var connectionState: VailClient.ConnectionState = .disconnected
-    @Published public var channel: String = "General"
-    @Published public var callsign: String = ""
-    @Published public var txTone: Int = 72
-    @Published public var rxDelayMs: Int = 2000
+    @Published public var channel: String = "General" {
+        didSet { UserDefaults.standard.set(channel, forKey: Self.channelDefaultsKey) }
+    }
+    @Published public var callsign: String = "" {
+        didSet { UserDefaults.standard.set(callsign, forKey: Self.callsignDefaultsKey) }
+    }
+    @Published public var txTone: Int = 72 {
+        didSet { UserDefaults.standard.set(txTone, forKey: Self.txToneDefaultsKey) }
+    }
+    @Published public var rxDelayMs: Int = 2000 {
+        didSet { UserDefaults.standard.set(rxDelayMs, forKey: Self.rxDelayDefaultsKey) }
+    }
     @Published public var users: [VailMessage.UserInfo] = []
     @Published public var rooms: [VailMessage.Room] = []
     @Published public var chatMessages: [ChatMessage] = []
     @Published public var lagMs: Int64 = 0
-    @Published public var breakInEnabled: Bool = false
+    @Published public var breakInEnabled: Bool = false {
+        didSet { UserDefaults.standard.set(breakInEnabled, forKey: Self.breakInDefaultsKey) }
+    }
     @Published public var lastNotice: String?
     @Published public var clientCount: Int = 0
     @Published public var roomDecoderEnabled: Bool = false
@@ -65,11 +75,46 @@ public final class VailSession: ObservableObject {
     /// Matches the web client's stuck-key safety.
     public static let stuckKeyTimeoutMs: Int64 = 10_000
 
+    private static let callsignDefaultsKey = "VailSession.callsign"
+    private static let channelDefaultsKey = "VailSession.channel"
+    private static let txToneDefaultsKey = "VailSession.txTone"
+    private static let rxDelayDefaultsKey = "VailSession.rxDelayMs"
+    private static let breakInDefaultsKey = "VailSession.breakInEnabled"
+
     public init(initialCallsign: String? = nil) {
-        let cs = initialCallsign ?? Self.generateAnonymousCallsign()
-        self.callsign = cs
-        self.client = VailClient(callsign: cs, txTone: 72)
+        let defaults = UserDefaults.standard
+
+        let storedCallsign = defaults.string(forKey: Self.callsignDefaultsKey)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let cs = initialCallsign
+            ?? (storedCallsign?.isEmpty == false ? storedCallsign! : Self.generateAnonymousCallsign())
+
+        let storedChannel = defaults.string(forKey: Self.channelDefaultsKey)
+        let resolvedChannel = (storedChannel?.isEmpty == false) ? storedChannel! : "General"
+
+        let resolvedTxTone = defaults.object(forKey: Self.txToneDefaultsKey) != nil
+            ? defaults.integer(forKey: Self.txToneDefaultsKey)
+            : 72
+        let resolvedRxDelay = defaults.object(forKey: Self.rxDelayDefaultsKey) != nil
+            ? defaults.integer(forKey: Self.rxDelayDefaultsKey)
+            : 2000
+        let resolvedBreakIn = defaults.object(forKey: Self.breakInDefaultsKey) != nil
+            ? defaults.bool(forKey: Self.breakInDefaultsKey)
+            : false
+
+        // Stored let properties first.
+        self.client = VailClient(callsign: cs, txTone: resolvedTxTone)
         self.keyer = KeyerEngine()
+
+        // didSet does not fire from designated initializer, so these loads do not
+        // re-write themselves to UserDefaults.
+        self.callsign = cs
+        self.channel = resolvedChannel
+        self.txTone = resolvedTxTone
+        self.rxDelayMs = resolvedRxDelay
+        self.breakInEnabled = resolvedBreakIn
+
+        self.keyer.localTxToneMIDI = resolvedTxTone
     }
 
     // MARK: - Lifecycle
