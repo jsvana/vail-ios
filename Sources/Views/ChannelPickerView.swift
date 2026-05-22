@@ -4,8 +4,7 @@
 import SwiftUI
 
 struct ChannelPickerView: View {
-
-    // Curated set matching the web client's dropdown.
+    /// Curated set matching the web client's dropdown.
     static let standardRooms: [String] = [
         "General",
         "Channel 1",
@@ -44,7 +43,7 @@ struct ChannelPickerView: View {
                 ForEach(Self.standardRooms, id: \.self) { name in
                     ChannelRow(
                         name: name,
-                        users: nil,
+                        users: occupancy[name] ?? 0,
                         isActive: name == session.channel
                     ) {
                         session.switchChannel(name)
@@ -68,6 +67,10 @@ struct ChannelPickerView: View {
             }
         }
         .navigationTitle("Channels")
+    }
+
+    private var occupancy: [String: Int] {
+        Dictionary(uniqueKeysWithValues: session.rooms.map { ($0.name, $0.users) })
     }
 }
 

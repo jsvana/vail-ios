@@ -38,7 +38,7 @@ struct SettingsView: View {
                             .font(.caption.monospaced())
                             .foregroundStyle(.secondary)
                     }
-                    Slider(value: $txToneField, in: 48...96, step: 1) {
+                    Slider(value: $txToneField, in: 48 ... 96, step: 1) {
                         Text("TX Tone")
                     }
                     .onChange(of: txToneField) { _, new in
@@ -51,7 +51,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading) {
                     Text("\(Int(rxDelayField)) ms")
                         .font(.body.monospaced())
-                    Slider(value: $rxDelayField, in: 500...5000, step: 100) {
+                    Slider(value: $rxDelayField, in: 500 ... 5000, step: 100) {
                         Text("RX Delay")
                     }
                     .onChange(of: rxDelayField) { _, new in
@@ -68,6 +68,20 @@ struct SettingsView: View {
                 LabeledContent("Connected") { Text("\(session.clientCount)") }
                 LabeledContent("State") { Text(stateText) }
                 LabeledContent("Room decoder") { Text(session.roomDecoderEnabled ? "Enabled" : "Disabled") }
+            }
+
+            Section {
+                NavigationLink {
+                    AboutView()
+                } label: {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Text("About this app")
+                    }
+                }
+            } footer: {
+                Text("Unofficial third-party client. Not affiliated with the Vail project.")
             }
         }
         .navigationTitle("Settings")

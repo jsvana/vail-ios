@@ -6,12 +6,22 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject var session: VailSession
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @AppStorage("hasAcknowledgedUnofficial") private var hasAcknowledged = false
+    @State private var showAbout = false
 
     var body: some View {
-        if sizeClass == .regular {
-            iPadLayout
-        } else {
-            iPhoneLayout
+        Group {
+            if sizeClass == .regular {
+                iPadLayout
+            } else {
+                iPhoneLayout
+            }
+        }
+        .fullScreenCover(isPresented: Binding(
+            get: { !hasAcknowledged },
+            set: { hasAcknowledged = !$0 }
+        )) {
+            UnofficialNoticeView()
         }
     }
 
@@ -23,7 +33,7 @@ struct ContentView: View {
                 .tabItem { Label("Roster", systemImage: "person.3") }
             ChannelPickerView()
                 .tabItem { Label("Channels", systemImage: "list.bullet") }
-            SettingsView()
+            NavigationStack { SettingsView() }
                 .tabItem { Label("Settings", systemImage: "gear") }
         }
     }
@@ -35,6 +45,25 @@ struct ContentView: View {
                 Section("Roster") { RosterView() }
             }
             .navigationTitle("Vail")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showAbout = true
+                    } label: {
+                        Label("About", systemImage: "info.circle")
+                    }
+                }
+            }
+            .sheet(isPresented: $showAbout) {
+                NavigationStack {
+                    AboutView()
+                        .toolbar {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button("Done") { showAbout = false }
+                            }
+                        }
+                }
+            }
         } detail: {
             OperatingView()
         }
