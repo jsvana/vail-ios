@@ -131,12 +131,6 @@ public final class KeyerEngine {
         let player = getOrCreateRxPlayer(midiNote: midiNote)
         let buffer = renderToneBuffer(midiNote: midiNote, durationMs: durationMs)
 
-        // Convert wall-clock ms to AVAudioTime in sample units.
-        guard let lastRender = engine.outputNode.lastRenderTime else {
-            log.warning("No lastRenderTime; can't schedule tone")
-            return
-        }
-
         let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
         let leadMs = max(0, playAtLocalMs - nowMs)
 
@@ -145,9 +139,12 @@ public final class KeyerEngine {
             // Still play it — better late than dropped.
         }
 
-        let leadSamples = Int64(Double(leadMs) / 1000.0 * sampleRate)
-        let scheduledSampleTime = lastRender.sampleTime + leadSamples
-        let avTime = AVAudioTime(sampleTime: scheduledSampleTime, atRate: sampleRate)
+        // Schedule via hostTime (mach_absolute_time). sampleTime is interpreted
+        // in the player node's own render timeline, which starts at 0 when the
+        // player is freshly attached — making engine.outputNode.lastRenderTime
+        // useless here. hostTime is universal across nodes.
+        let hostLead = AVAudioTime.hostTime(forSeconds: Double(leadMs) / 1000.0)
+        let avTime = AVAudioTime(hostTime: mach_absolute_time() + hostLead)
 
         if !player.isPlaying {
             player.play()

@@ -81,9 +81,12 @@ public struct VailMessage: Codable, Equatable, Sendable {
             self.txTone = txTone
         }
 
+        // Server sends these as lowercase inside UsersInfo arrays even though
+        // the top-level envelope uses uppercase keys. Confirmed against the
+        // wire on 2026-05-21.
         enum CodingKeys: String, CodingKey {
-            case callsign = "Callsign"
-            case txTone = "TxTone"
+            case callsign
+            case txTone
         }
     }
 
@@ -96,9 +99,10 @@ public struct VailMessage: Codable, Equatable, Sendable {
             self.users = users
         }
 
+        // See UserInfo: server uses lowercase keys inside Rooms arrays.
         enum CodingKeys: String, CodingKey {
-            case name = "Name"
-            case users = "Users"
+            case name
+            case users
         }
     }
 

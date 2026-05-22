@@ -401,24 +401,32 @@ These are not in v1 but the architecture has space for them:
 
 ---
 
-## 7. Open questions / things to confirm against the wire
+## 7. Confirmed wire details and remaining open questions
 
-These are things I'm 70-90% sure about but worth a DevTools spot-check:
+### Confirmed against the wire (2026-05-21)
 
-1. **`UsersInfo` field structure**: assumed `{Callsign, TxTone}`. Could be
-   `{Name, TxTone}` or other key names. Confirm in DevTools.
-2. **`Rooms` field structure**: assumed `{Name, Users}` where Users is a
-   count. Could be array of names or full user objects. Confirm.
-3. **Timestamp signedness**: assumed `Int64`. Server uses Go `int64`, which is
+1. **`UsersInfo` field structure**: `[{callsign: String, txTone: Int}]` —
+   note the **lowercase** keys, inconsistent with the rest of the envelope
+   which uses uppercase. iOS `VailMessage.UserInfo` CodingKeys reflect this.
+2. **`Rooms` field structure**: `[{name: String, users: Int, private: Bool}]`
+   — also lowercase keys. `private` is currently ignored on the client.
+3. **Server includes `UsersInfo` on every message**, including chat and
+   (presumably) tone bursts. Decoding it must succeed or every message is
+   dropped. This caused the original "zero users + no RX audio" bug — see
+   git history for the fix.
+
+### Still open
+
+1. **Timestamp signedness**: assumed `Int64`. Server uses Go `int64`, which is
    signed. Should be safe through 2262.
-4. **Are echoes of own messages bit-exact?** Documented behavior: server passes
-   through. Verify by logging in DevTools — if server modifies timestamps,
-   echo suppression breaks.
-5. **`Notice` field**: referenced in `vail.mjs` but not in observed
+2. **Are echoes of own messages bit-exact?** Documented behavior: server
+   passes through. Verify by logging in DevTools — if server modifies
+   timestamps, echo suppression breaks.
+3. **`Notice` field**: referenced in `vail.mjs` but not in observed
    server-to-client messages I've seen. May appear in admin/error paths.
-6. **What happens if you send `Duration: []` with no callsign?** Probably
+4. **What happens if you send `Duration: []` with no callsign?** Probably
    treated as a keepalive ping with empty roster info. Test.
-7. **Can `TxTone` be 0?** Web client treats 0 as "not specified" and falls
+5. **Can `TxTone` be 0?** Web client treats 0 as "not specified" and falls
    back to 69 (A4). Match this convention.
 
 ---
