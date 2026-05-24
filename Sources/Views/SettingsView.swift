@@ -8,6 +8,7 @@ struct SettingsView: View {
     @State private var callsignField: String = ""
     @State private var txToneField: Double = 72
     @State private var rxDelayField: Double = 2000
+    @State private var keyerWPMField: Double = 20
     @FocusState private var callsignFocused: Bool
 
     var body: some View {
@@ -63,6 +64,39 @@ struct SettingsView: View {
                 }
             }
 
+            Section("Vail Adapter") {
+                LabeledContent("Status") {
+                    Text(session.midiAdapterConnected ? "Connected" : "Not connected")
+                        .foregroundStyle(session.midiAdapterConnected ? Color.green : Color.secondary)
+                }
+                Picker("Keyer mode", selection: $session.keyerMode) {
+                    ForEach(MIDIOutput.KeyerMode.allCases, id: \.rawValue) { mode in
+                        Text(mode.displayName).tag(mode.rawValue)
+                    }
+                }
+                VStack(alignment: .leading) {
+                    HStack {
+                        Text("Keyer speed")
+                        Spacer()
+                        Text("\(Int(keyerWPMField)) WPM")
+                            .font(.body.monospaced())
+                    }
+                    Slider(value: $keyerWPMField, in: 5 ... 40, step: 1) {
+                        Text("Keyer speed")
+                    }
+                    .onChange(of: keyerWPMField) { _, new in
+                        session.keyerWPM = Int(new)
+                    }
+                    Text("Dit length for adapter-generated keying (iambic / bug). Ignored for straight key.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Toggle("RX piezo feedback", isOn: $session.adapterRxFeedbackEnabled)
+                Text("Buzz the adapter's piezo for received transmissions.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Diagnostics") {
                 LabeledContent("Lag") { Text("\(session.lagMs) ms").monospaced() }
                 LabeledContent("Connected") { Text("\(session.clientCount)") }
@@ -96,6 +130,7 @@ struct SettingsView: View {
             callsignField = session.callsign
             txToneField = Double(session.txTone)
             rxDelayField = Double(session.rxDelayMs)
+            keyerWPMField = Double(session.keyerWPM)
         }
     }
 

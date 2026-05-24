@@ -223,13 +223,18 @@ app backgrounding without audio entitlement, or on stuck-key detection:
 **panic**. Force-stop all players, force key-up state, cancel any in-flight
 transmission. Mirror the `Panic()` method in `outputs.mjs`.
 
-### MIDI output to Vail Adapter (deferred)
+### MIDI output to Vail Adapter
 
-The web client also sends MIDI note-on/off to connected MIDI devices on RX,
-so the Vail Adapter's onboard piezo buzzes received CW. iOS equivalent: write
-to a CoreMIDI output port matched to the adapter's input. Not implemented in
-v1 but the architecture has space for it (add a `MIDIOutput` subscriber to
-`VailSession`).
+Implemented in `Sources/Input/MIDIOutput.swift` (a `MIDIOutput` actor owned by
+`VailSession`). It opens a CoreMIDI output port, finds the adapter's
+destination, and on connect sends the web-client init sequence — `B0 00 00`
+(switch out of HID keyboard mode), dit duration, keyer mode, sidetone. Keyer
+mode / speed / sidetone are reconfigurable at runtime.
+
+The web client also sends MIDI note-on/off to the adapter on RX so its onboard
+piezo buzzes received CW. `MIDIOutput.scheduleBuzz` does this, gated behind the
+`adapterRxFeedbackEnabled` setting; note-on/off are timestamped (mach time) to
+land in sync with the audio playback.
 
 ---
 
@@ -335,7 +340,7 @@ Sources/
 ├── App/             # App entry point, root view
 ├── Protocol/        # VailMessage, VailClient (network layer)
 ├── Audio/           # KeyerEngine (TX + RX audio)
-├── Input/           # MIDIInput (CoreMIDI), touch input lives in Views
+├── Input/           # MIDIInput + MIDIOutput (CoreMIDI), touch input in Views
 ├── ViewModels/      # VailSession (orchestrates everything)
 └── Views/           # SwiftUI views
 ```
@@ -357,9 +362,12 @@ Vail Adapter ──MIDI──▶ MIDIInput ──key event──▶ VailSession 
                                                               │
                                                               └──▶ VailClient.transmitTone
 
-VailClient ──tone event──▶ VailSession ──▶ KeyerEngine.scheduleReceivedTone
+VailClient ──tone event──▶ VailSession ──┬──▶ KeyerEngine.scheduleReceivedTone
+                                         └──▶ MIDIOutput.scheduleBuzz (RX piezo, opt-in)
 VailClient ──roster─────▶ VailSession ──▶ @Published users
 VailClient ──chat──────▶ VailSession ──▶ @Published messages
+
+VailSession ──config──▶ MIDIOutput ──MIDI──▶ Vail Adapter (mode/keyer/speed/sidetone)
 ```
 
 ### Audio session
@@ -389,13 +397,11 @@ These are not in v1 but the architecture has space for them:
   view and a `@Published` message buffer.
 - **Decoder**: CW-to-text decoding. Port from a known implementation (the web
   client's `decoder.mjs`).
-- **MIDI output to adapter** (RX feedback): port `MIDIBuzzer` from
-  `outputs.mjs`. CoreMIDI output port to adapter's input.
 - **Settings persistence**: `UserDefaults` keys `VailSession.callsign`,
   `VailSession.channel`, `VailSession.txTone`, `VailSession.rxDelayMs`,
-  `VailSession.breakInEnabled` are persisted via `didSet` observers on the
-  `@Published` properties. WPM and sidetone preference are still deferred —
-  no UI surface yet.
+  `VailSession.breakInEnabled`, `VailSession.keyerMode`, `VailSession.keyerWPM`,
+  and `VailSession.adapterRxFeedback` are persisted via `didSet` observers on the
+  `@Published` properties.
 - **BLE MIDI pairing UI**: `CABTMIDICentralViewController` wrapped for
   SwiftUI. CoreMIDI sees BLE devices automatically once paired.
 - **Background audio entitlement**: requires explicit Info.plist key + UI

@@ -45,6 +45,33 @@ public final class VailSession: ObservableObject {
     @Published public var clientCount: Int = 0
     @Published public var roomDecoderEnabled: Bool = false
 
+    /// Whether a Vail Adapter is connected for MIDI output (config + RX piezo).
+    @Published public var midiAdapterConnected: Bool = false
+
+    /// Keyer mode pushed to the adapter (raw value of MIDIOutput.KeyerMode).
+    @Published public var keyerMode: Int = MIDIOutput.KeyerMode.straightKey.rawValue {
+        didSet {
+            UserDefaults.standard.set(keyerMode, forKey: Self.keyerModeDefaultsKey)
+            let mode = MIDIOutput.KeyerMode(rawValue: keyerMode) ?? .straightKey
+            Task { await midiOutput?.setKeyerMode(mode) }
+        }
+    }
+
+    /// Keyer speed in WPM, sent to the adapter as a dit duration. Only affects
+    /// adapter-generated keying (iambic/bug modes), not straight key.
+    @Published public var keyerWPM: Int = 20 {
+        didSet {
+            UserDefaults.standard.set(keyerWPM, forKey: Self.keyerWPMDefaultsKey)
+            let wpm = keyerWPM
+            Task { await midiOutput?.setSpeed(wpm: wpm) }
+        }
+    }
+
+    /// When enabled, received tones also buzz the adapter's piezo.
+    @Published public var adapterRxFeedbackEnabled: Bool = false {
+        didSet { UserDefaults.standard.set(adapterRxFeedbackEnabled, forKey: Self.adapterRxFeedbackDefaultsKey) }
+    }
+
     public struct ChatMessage: Identifiable, Sendable, Equatable {
         public let id = UUID()
         public let text: String
@@ -57,6 +84,7 @@ public final class VailSession: ObservableObject {
     private let client: VailClient
     private let keyer: KeyerEngine
     private var midi: MIDIInput?
+    private var midiOutput: MIDIOutput?
     private var clientEventTask: Task<Void, Never>?
 
     // Per-key TX state.
@@ -80,6 +108,9 @@ public final class VailSession: ObservableObject {
     private static let txToneDefaultsKey = "VailSession.txTone"
     private static let rxDelayDefaultsKey = "VailSession.rxDelayMs"
     private static let breakInDefaultsKey = "VailSession.breakInEnabled"
+    private static let keyerModeDefaultsKey = "VailSession.keyerMode"
+    private static let keyerWPMDefaultsKey = "VailSession.keyerWPM"
+    private static let adapterRxFeedbackDefaultsKey = "VailSession.adapterRxFeedback"
 
     public init(initialCallsign: String? = nil) {
         let defaults = UserDefaults.standard
@@ -114,6 +145,16 @@ public final class VailSession: ObservableObject {
         self.rxDelayMs = resolvedRxDelay
         self.breakInEnabled = resolvedBreakIn
 
+        self.keyerMode = defaults.object(forKey: Self.keyerModeDefaultsKey) != nil
+            ? defaults.integer(forKey: Self.keyerModeDefaultsKey)
+            : MIDIOutput.KeyerMode.straightKey.rawValue
+        self.keyerWPM = defaults.object(forKey: Self.keyerWPMDefaultsKey) != nil
+            ? defaults.integer(forKey: Self.keyerWPMDefaultsKey)
+            : 20
+        self.adapterRxFeedbackEnabled = defaults.object(forKey: Self.adapterRxFeedbackDefaultsKey) != nil
+            ? defaults.bool(forKey: Self.adapterRxFeedbackDefaultsKey)
+            : false
+
         self.keyer.localTxToneMIDI = resolvedTxTone
     }
 
@@ -137,6 +178,23 @@ public final class VailSession: ObservableObject {
             self.midi = m
         } catch {
             log.error("MIDIInput init failed: \(error.localizedDescription)")
+        }
+
+        do {
+            let out = try MIDIOutput()
+            self.midiOutput = out
+            let mode = MIDIOutput.KeyerMode(rawValue: keyerMode) ?? .straightKey
+            let wpm = keyerWPM
+            let tone = txTone
+            Task {
+                await out.setOnConnectionChange { [weak self] connected in
+                    Task { @MainActor in self?.midiAdapterConnected = connected }
+                }
+                await out.configure(keyerMode: mode, wpm: wpm, sidetoneMIDINote: tone)
+                await out.connectToAdapter()
+            }
+        } catch {
+            log.error("MIDIOutput init failed: \(error.localizedDescription)")
         }
 
         clientEventTask?.cancel()
@@ -191,6 +249,7 @@ public final class VailSession: ObservableObject {
         txTone = clamped
         keyer.localTxToneMIDI = clamped
         Task { await client.setTxTone(clamped) }
+        Task { await midiOutput?.setSidetone(midiNote: clamped) }
     }
 
     public func sendChat(_ text: String) {
@@ -292,6 +351,10 @@ public final class VailSession: ObservableObject {
                 durationMs: durationMs,
                 playAtLocalMs: playAt
             )
+            if adapterRxFeedbackEnabled {
+                let buzzNote = UInt8(max(0, min(127, note)))
+                Task { await midiOutput?.scheduleBuzz(note: buzzNote, durationMs: durationMs, playAtLocalMs: playAt) }
+            }
 
         case .chat(let text, let cs, let ts):
             chatMessages.append(ChatMessage(text: text, callsign: cs, timestampMs: ts))

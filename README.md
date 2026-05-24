@@ -23,6 +23,8 @@ up the codebase quickly. Read it before making significant changes.
 - TX local sidetone (continuous oscillator with 5ms ramp)
 - RX scheduled playback with per-sender tone pool
 - CoreMIDI input from Vail Adapter (notes 0/1/2 = straight/dit/dah)
+- CoreMIDI output to Vail Adapter: switches it into MIDI mode (suppresses HID
+  keystrokes), configures keyer mode / speed / sidetone, optional RX piezo feedback
 - Roster display (connected users with their TX tones)
 - Channel switching
 - Touch-input "big key" for testing without a hardware keyer
@@ -36,7 +38,6 @@ CLAUDE.md §6 for details.
 - Recording channel sessions (audio file)
 - Chat UI (protocol layer handles it; needs SwiftUI view)
 - CW decoder
-- MIDI output to adapter for RX piezo feedback
 - BLE MIDI pairing UI
 - Background audio entitlement
 - Settings persistence (UserDefaults)
@@ -110,7 +111,8 @@ See CLAUDE.md §6 for full data flow.
 | Wire protocol / JSON shape      | `Sources/Protocol/VailMessage.swift` |
 | WebSocket / echo / keepalive    | `Sources/Protocol/VailClient.swift`  |
 | Audio rendering / tone pool     | `Sources/Audio/KeyerEngine.swift`    |
-| Vail Adapter integration        | `Sources/Input/MIDIInput.swift`      |
+| Vail Adapter input (key events) | `Sources/Input/MIDIInput.swift`      |
+| Vail Adapter output (config/buzz)| `Sources/Input/MIDIOutput.swift`    |
 | Top-level orchestration         | `Sources/ViewModels/VailSession.swift` |
 | Connect to vailmorse.com        | `Sources/Protocol/VailClient.swift` (`baseURL`) |
 | UI                              | `Sources/Views/*.swift`              |
