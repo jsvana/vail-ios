@@ -461,8 +461,8 @@ These are not in v1 but the architecture has space for them:
 - **github.com/Vail-CW/vail-adapter**: adapter firmware. Defines the MIDI
   message vocabulary.
 - **vailadapter.com**: adapter purchase / build info.
-- **discord.gg/ERceAGnCr7**: Vail community. Brett (KE9BOS) is reachable
-  there or at `ke9bos@pigletradio.org`.
+- **discord.gg/h28DefCf6J**: Vail community Discord. iOS-specific feedback
+  goes in the `#ios-apps` channel.
 
 ---
 

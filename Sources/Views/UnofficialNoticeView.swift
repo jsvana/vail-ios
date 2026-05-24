@@ -29,8 +29,9 @@ struct UnofficialNoticeView: View {
                         Text("It is **not** made, maintained, or endorsed by the Vail project or its team.")
 
                         Text("""
-                        Please **contact me (W6JY, jaysvana@gmail.com)** with all feedback, bug reports, \
-                        and support requests — not the Vail community, Discord, or Brett (KE9BOS).
+                        Please send feedback, bug reports, and support requests to the \
+                        **#ios-apps** channel in the Vail Discord (discord.gg/h28DefCf6J) — \
+                        not to the broader Vail community or team.
                         """)
 
                         Text("""

@@ -7,6 +7,7 @@ struct AboutView: View {
     private let contactCallsign = "W6JY"
     private let contactEmail = "jaysvana@gmail.com"
     private let officialURL = URL(string: "https://vailmorse.com")!
+    private let feedbackURL = URL(string: "https://discord.gg/h28DefCf6J")!
 
     var body: some View {
         Form {
@@ -23,8 +24,8 @@ struct AboutView: View {
                     network. It is not made, maintained, or endorsed by the Vail project or its team.
                     """)
                     Text("""
-                    Please **contact me (W6JY, jaysvana@gmail.com)** with all feedback, bug reports, \
-                    and support requests — not the Vail community, Discord, or Brett (KE9BOS).
+                    Please send feedback, bug reports, and support requests to the **#ios-apps** \
+                    channel in the Vail Discord — not to the broader Vail community or team.
                     """)
                     Text("""
                     The Vail repeater protocol may change at any time. When it does, this app may stop \
@@ -36,6 +37,15 @@ struct AboutView: View {
                 .padding(.vertical, 4)
             } header: {
                 Text("Disclaimer")
+            }
+
+            Section("Feedback") {
+                Link(destination: feedbackURL) {
+                    LabeledContent("Discord") {
+                        Text("#ios-apps")
+                            .foregroundStyle(.tint)
+                    }
+                }
             }
 
             Section("Contact") {
