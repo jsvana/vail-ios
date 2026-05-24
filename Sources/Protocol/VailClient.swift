@@ -254,7 +254,7 @@ public actor VailClient {
         Task {
             do {
                 try await sendHello()
-                await self.markConnected()
+                self.markConnected()
             } catch {
                 log.error("sendHello failed: \(error.localizedDescription)")
             }

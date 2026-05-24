@@ -325,7 +325,7 @@ public final class VailSession: ObservableObject {
             try? await Task.sleep(for: .milliseconds(Int(timeout)))
             if Task.isCancelled { return }
             guard let self else { return }
-            await self.handleStuckKey()
+            self.handleStuckKey()
         }
     }
 

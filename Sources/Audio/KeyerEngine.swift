@@ -25,10 +25,10 @@ public final class KeyerEngine {
 
     /// 5ms attack/release matches the web client's `OscillatorRampDuration`.
     /// Linear ramp; avoids the square-wave overtones of instant transitions.
-    public static let envelopeRampMs: Double = 5
+    public nonisolated static let envelopeRampMs: Double = 5
 
     /// Master peak amplitude. 0.5 matches the web client's `txGain`.
-    public static let masterAmplitude: Float = 0.5
+    public nonisolated static let masterAmplitude: Float = 0.5
 
     // MARK: - Public state
 

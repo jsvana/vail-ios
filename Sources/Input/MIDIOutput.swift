@@ -63,8 +63,8 @@ public actor MIDIOutput {
         var sidetoneMIDINote: Int = 72 // C5
     }
 
-    private var client: MIDIClientRef = 0
-    private var port: MIDIPortRef = 0
+    nonisolated(unsafe) private var client: MIDIClientRef = 0
+    nonisolated(unsafe) private var port: MIDIPortRef = 0
     private var destination: MIDIEndpointRef = 0
     private var config = Config()
 
@@ -80,31 +80,34 @@ public actor MIDIOutput {
     }()
 
     public init() throws {
-        try createClient()
-        try createOutputPort()
+        var newClient: MIDIClientRef = 0
+        let clientStatus = MIDIClientCreateWithBlock(
+            "VailMorseMIDIOutClient" as CFString,
+            &newClient
+        ) { [weak self] notificationPtr in
+            let messageID = notificationPtr.pointee.messageID
+            Task { [weak self] in await self?.handleNotification(messageID) }
+        }
+        guard clientStatus == noErr else {
+            log.error("MIDIClientCreateWithBlock failed: \(clientStatus)")
+            throw MIDIOutputError.osStatus("MIDIClientCreateWithBlock", clientStatus)
+        }
+
+        var newPort: MIDIPortRef = 0
+        let portStatus = MIDIOutputPortCreate(newClient, "VailMorseOutput" as CFString, &newPort)
+        guard portStatus == noErr else {
+            MIDIClientDispose(newClient)
+            log.error("MIDIOutputPortCreate failed: \(portStatus)")
+            throw MIDIOutputError.osStatus("MIDIOutputPortCreate", portStatus)
+        }
+
+        self.client = newClient
+        self.port = newPort
     }
 
     deinit {
         if port != 0 { MIDIPortDispose(port) }
         if client != 0 { MIDIClientDispose(client) }
-    }
-
-    // MARK: - Setup
-
-    private func createClient() throws {
-        let status = MIDIClientCreateWithBlock(
-            "VailMorseMIDIOutClient" as CFString,
-            &client
-        ) { [weak self] notificationPtr in
-            let messageID = notificationPtr.pointee.messageID
-            Task { [weak self] in await self?.handleNotification(messageID) }
-        }
-        try check(status, op: "MIDIClientCreateWithBlock")
-    }
-
-    private func createOutputPort() throws {
-        let status = MIDIOutputPortCreate(client, "VailMorseOutput" as CFString, &port)
-        try check(status, op: "MIDIOutputPortCreate")
     }
 
     // MARK: - Callbacks
