@@ -125,43 +125,58 @@ public actor MIDIOutput {
 
     public func setKeyerMode(_ mode: KeyerMode) {
         config.keyerMode = mode
-        guard isConnected else { return }
-        send([0xC0, UInt8(mode.rawValue)])
+        guard destination != 0 else { return }
+        send([0xC0, UInt8(mode.rawValue)], to: destination)
         log.info("Set keyer mode \(mode.rawValue) (\(mode.displayName))")
     }
 
     public func setSpeed(wpm: Int) {
         config.ditDurationMs = Self.ditDurationMs(forWPM: wpm)
-        guard isConnected else { return }
-        send([0xB0, 0x01, UInt8(min(127, config.ditDurationMs / 2))])
+        guard destination != 0 else { return }
+        send([0xB0, 0x01, UInt8(min(127, config.ditDurationMs / 2))], to: destination)
         log.info("Set keyer speed \(wpm) WPM (dit \(self.config.ditDurationMs)ms)")
     }
 
     public func setSidetone(midiNote: Int) {
         config.sidetoneMIDINote = max(0, min(127, midiNote))
-        guard isConnected else { return }
-        send([0xB0, 0x02, UInt8(config.sidetoneMIDINote)])
+        guard destination != 0 else { return }
+        send([0xB0, 0x02, UInt8(config.sidetoneMIDINote)], to: destination)
     }
 
     // MARK: - Connection
 
-    /// Scan for a Vail Adapter destination and (re)connect. Sends the init
-    /// sequence on a fresh connection. Idempotent — safe to call repeatedly,
-    /// including from CoreMIDI setup-change notifications.
+    /// Wake the adapter and identify it as the RX-feedback target.
+    ///
+    /// The adapter boots in HID keyboard mode and only starts sending MIDI note
+    /// events once it receives a Control Change. So this broadcast — sending
+    /// the init sequence (mode switch, dit duration, keyer mode, sidetone) to
+    /// *every* non-network destination — is what actually makes MIDI **input**
+    /// work. We broadcast rather than only targeting a name-matched device
+    /// because the adapter enumerates under different names across firmwares
+    /// ("Vail", "QT Py M0", etc.) and may not match our heuristics. The
+    /// positively-identified adapter (if any) becomes the buzzer destination.
+    ///
+    /// Idempotent — safe to call repeatedly, including from CoreMIDI
+    /// setup-change notifications.
     public func connectToAdapter() {
-        if let adapter = findVailAdapterDestination() {
-            guard destination != adapter || !isConnected else { return }
-            destination = adapter
-            isConnected = true
-            sendInitSequence()
-            onConnectionChange?(true)
-            log.info("Connected to Vail Adapter output")
-        } else if isConnected {
-            destination = 0
-            isConnected = false
-            onConnectionChange?(false)
-            log.info("Vail Adapter output disconnected")
+        let destinations = nonNetworkDestinations()
+        for dest in destinations {
+            sendInitSequence(to: dest)
         }
+
+        let adapter = findVailAdapterDestination()
+        destination = adapter ?? 0
+        let connected = adapter != nil
+        if connected != isConnected {
+            isConnected = connected
+            onConnectionChange?(connected)
+        }
+        log.info("Woke \(destinations.count) MIDI destination(s); adapter \(connected ? "identified" : "not identified")")
+    }
+
+    /// User-triggered retry of the wake/identify sequence (Settings button).
+    public func wakeAdapter() {
+        connectToAdapter()
     }
 
     /// RX piezo feedback: buzz the adapter for a received tone, scheduled to
@@ -169,28 +184,41 @@ public actor MIDIOutput {
     /// are timestamped via mach_absolute_time so CoreMIDI delivers them
     /// sample-accurately rather than back-to-back.
     public func scheduleBuzz(note: UInt8, durationMs: UInt16, playAtLocalMs: Int64) {
-        guard isConnected, durationMs > 0 else { return }
+        guard destination != 0, durationMs > 0 else { return }
         let clamped = min(note, 127)
         let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
         let leadMs = max(0, playAtLocalMs - nowMs)
         let onTs = machTime(forMillisFromNow: leadMs)
         let offTs = machTime(forMillisFromNow: leadMs + Int64(durationMs))
-        send([0x90, clamped, 0x7F], at: onTs)
-        send([0x80, clamped, 0x00], at: offTs)
+        send([0x90, clamped, 0x7F], to: destination, at: onTs)
+        send([0x80, clamped, 0x00], to: destination, at: offTs)
     }
 
     // MARK: - Init sequence
 
     /// Mirrors the web repeater's connection sequence (inputs.mjs): disable
     /// keyboard mode, set dit duration, set keyer mode, set sidetone.
-    private func sendInitSequence() {
-        send([0xB0, 0x00, 0x00]) // disable keyboard mode (enable MIDI mode)
-        send([0xB0, 0x01, UInt8(min(127, config.ditDurationMs / 2))])
-        send([0xC0, UInt8(config.keyerMode.rawValue)])
-        send([0xB0, 0x02, UInt8(config.sidetoneMIDINote)])
+    private func sendInitSequence(to dest: MIDIEndpointRef) {
+        send([0xB0, 0x00, 0x00], to: dest) // disable keyboard mode (enable MIDI mode)
+        send([0xB0, 0x01, UInt8(min(127, config.ditDurationMs / 2))], to: dest)
+        send([0xC0, UInt8(config.keyerMode.rawValue)], to: dest)
+        send([0xB0, 0x02, UInt8(config.sidetoneMIDINote)], to: dest)
     }
 
     // MARK: - Device discovery
+
+    /// All MIDI destinations except CoreMIDI network sessions.
+    private func nonNetworkDestinations() -> [MIDIEndpointRef] {
+        var result: [MIDIEndpointRef] = []
+        let count = MIDIGetNumberOfDestinations()
+        for i in 0 ..< count {
+            let dest = MIDIGetDestination(i)
+            let name = endpointStringProperty(dest, kMIDIPropertyDisplayName).lowercased()
+            if name.contains("network"), name.contains("session") { continue }
+            result.append(dest)
+        }
+        return result
+    }
 
     private func findVailAdapterDestination() -> MIDIEndpointRef? {
         let count = MIDIGetNumberOfDestinations()
@@ -232,8 +260,8 @@ public actor MIDIOutput {
 
     // MARK: - Sending
 
-    private func send(_ message: [UInt8], at timeStamp: MIDITimeStamp = 0) {
-        guard port != 0, destination != 0, message.count <= 256 else { return }
+    private func send(_ message: [UInt8], to dest: MIDIEndpointRef, at timeStamp: MIDITimeStamp = 0) {
+        guard port != 0, dest != 0, message.count <= 256 else { return }
 
         var packet = MIDIPacket()
         packet.timeStamp = timeStamp
@@ -243,7 +271,7 @@ public actor MIDIOutput {
         }
 
         var list = MIDIPacketList(numPackets: 1, packet: packet)
-        let status = MIDISend(port, destination, &list)
+        let status = MIDISend(port, dest, &list)
         if status != noErr {
             log.error("MIDISend failed: \(status)")
         }

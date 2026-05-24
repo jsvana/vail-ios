@@ -256,6 +256,12 @@ public final class VailSession: ObservableObject {
         Task { await client.sendChat(text) }
     }
 
+    /// Re-broadcast the adapter wake/config sequence. Use when the adapter is
+    /// plugged in but not responding (it may have powered up in keyboard mode).
+    public func wakeMidiAdapter() {
+        Task { await midiOutput?.wakeAdapter() }
+    }
+
     // MARK: - Key event handling
 
     private func handleMIDIEvent(_ event: MIDIInput.Event) {

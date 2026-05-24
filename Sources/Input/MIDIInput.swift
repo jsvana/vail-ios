@@ -91,9 +91,10 @@ public final class MIDIInput {
 
     private func handleNotification(_ notification: UnsafePointer<MIDINotification>) {
         let id = notification.pointee.messageID
-        if id == .msgObjectAdded {
-            // New device appeared (e.g., Vail Adapter just plugged in).
-            // Re-scan and connect.
+        // A device appearing fires .msgObjectAdded, but a USB MIDI device being
+        // plugged in can surface only as .msgSetupChanged on some iOS versions.
+        // Re-scan on either so a hot-plugged Vail Adapter always connects.
+        if id == .msgObjectAdded || id == .msgSetupChanged {
             connectAllSources()
         }
     }
@@ -122,6 +123,7 @@ public final class MIDIInput {
         let status = bytes[0] & 0xF0
         let note = bytes[1]
         let velocity = bytes[2]
+        log.debug("MIDI in: status=0x\(String(status, radix: 16)) note=\(note) vel=\(velocity)")
 
         let isDown: Bool
         switch status {
@@ -136,12 +138,21 @@ public final class MIDIInput {
             return
         }
 
+        // The adapter sends different note numbers per firmware/keyer mode:
+        //   straight key = 0
+        //   dit paddle   = 1, 20, or (passthrough) 61 (C#4)
+        //   dah paddle   = 2, 21, or (passthrough) 62 (D4)
+        // Match the Vail web repeater's full set so paddle input works
+        // regardless of mode. Unknown notes are ignored (we connect to all
+        // sources, so an unrelated synth must not register as keying).
         let key: Key
         switch note {
         case 0: key = .straight
-        case 1: key = .dit
-        case 2: key = .dah
-        default: return
+        case 1, 20, 61: key = .dit
+        case 2, 21, 62: key = .dah
+        default:
+            log.debug("Ignoring unmapped MIDI note \(note)")
+            return
         }
 
         let timestampMs = Self.machTimeToWallClockMs(packet.timeStamp)

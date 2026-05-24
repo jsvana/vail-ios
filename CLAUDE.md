@@ -256,8 +256,16 @@ MIDI channel 1 (zero-indexed channel 0).
 | Note On `90 02 7F`   | Dah paddle closed                |
 | Note Off `80 02 00`  | Dah paddle open                  |
 
-Note: spec docs claim notes C#/D for dit/dah; actual firmware sends raw notes
-1/2. Code is source of truth.
+Note: spec docs claim notes C#/D for dit/dah, but the note number actually
+varies by firmware and keyer mode. `MIDIInput` accepts the full Vail web
+repeater set: straight = 0, dit = 1 / 20 / 61 (C#4), dah = 2 / 21 / 62 (D4).
+Unmapped notes are ignored (we connect to all sources, so unrelated MIDI must
+not register as keying). Code is source of truth.
+
+Critically, the adapter boots in HID **keyboard** mode and does not emit these
+note events until the host sends a Control Change. `MIDIOutput.connectToAdapter`
+broadcasts the mode-switch (`B0 00 00`) to all destinations on start and on
+every CoreMIDI setup change — without it, MIDI input never fires.
 
 Use `MIDIPacket.timeStamp` (mach_absolute_time units) for accurate key event
 timing. Convert via `mach_timebase_info`.

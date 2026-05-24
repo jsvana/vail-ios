@@ -64,7 +64,7 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Vail Adapter") {
+            Section {
                 LabeledContent("Status") {
                     Text(session.midiAdapterConnected ? "Connected" : "Not connected")
                         .foregroundStyle(session.midiAdapterConnected ? Color.green : Color.secondary)
@@ -95,6 +95,16 @@ struct SettingsView: View {
                 Text("Buzz the adapter's piezo for received transmissions.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                Button {
+                    session.wakeMidiAdapter()
+                } label: {
+                    Label("Wake up adapter", systemImage: "bolt.fill")
+                }
+            } header: {
+                Text("Vail Adapter")
+            } footer: {
+                Text("The adapter powers up as a keyboard. If keying isn't detected, tap \"Wake up adapter\" to switch it into MIDI mode.")
             }
 
             Section("Diagnostics") {
