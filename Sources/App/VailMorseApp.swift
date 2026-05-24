@@ -50,6 +50,8 @@ struct VailMorseApp: App {
     @StateObject private var session = VailSession()
     @StateObject private var skedStore: SkedStore
     @StateObject private var skedRunner: SkedRunner
+    @StateObject private var contactStore = ContactStore()
+    @StateObject private var presenceScanner = ContactPresenceScanner()
 
     private let skedNotifier: SkedNotifier
 
@@ -67,10 +69,13 @@ struct VailMorseApp: App {
                 .environmentObject(session)
                 .environmentObject(skedStore)
                 .environmentObject(skedRunner)
+                .environmentObject(contactStore)
+                .environmentObject(presenceScanner)
                 .onAppear {
                     session.start()
                     session.connect()
                     skedRunner.attach(session)
+                    skedRunner.attachContacts(contactStore)
                     skedRunner.startMonitoring()
                     skedNotifier.registerCategory()
                     Task { await skedStore.requestNotificationAuthorization() }

@@ -395,6 +395,31 @@ Implemented in `VailSession`. If any key has been "down" for more than 10
 seconds, force a key-up event and toast the user. This prevents jammed
 paddles from spamming the channel.
 
+### Contacts and cross-channel presence
+
+`Sources/Contacts/` adds a local address book that augments skeds:
+
+- **`Contact` / `ContactStore`**: device-local operators (callsign, name,
+  favorite, usual channel, `lastWorked`), persisted to `contacts.json` exactly
+  like `SkedStore`. The Vail server has **no presence or friends API**, so
+  contacts are matched against rosters by callsign — there is nothing to sync.
+- **`ContactPresenceScanner`**: finds *which channel* a contact is on. Since
+  the `Rooms` list carries only names + counts (never callsigns), the only way
+  to locate a callsign is to connect to a room and read its `UsersInfo`. The
+  scanner opens its own short-lived `URLSessionWebSocketTask` per candidate room
+  (separate from `VailClient`, so live audio is untouched), sends a normal hello
+  (`Private/Decoder = false` so it joins the *same* room instance the user
+  would), reads the first roster, and closes. Probes run in bounded-concurrency
+  batches with a per-room timeout watchdog. **Cost**: probing briefly joins each
+  room, so the probe (an anonymous `scanNNNN` callsign) shows up in that room's
+  roster for a second or two. Keep scans **on-demand only** — never a background
+  poll — and skip the user's live channel (seed it from `VailSession.users`).
+- **Integration**: the roster tab gains a `Connected / Contacts` segment;
+  `SkedEditView` picks expected callsigns from contacts; `SkedRunner` stamps
+  `lastWorked` from a finished run's participants; `VailSession.qsoChannelName`
+  derives a deterministic private channel (`QSO-<sorted callsigns>`) so two
+  operators can meet on the same name.
+
 ### What's deferred
 
 These are not in v1 but the architecture has space for them:

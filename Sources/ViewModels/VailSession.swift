@@ -237,6 +237,18 @@ public final class VailSession: ObservableObject {
         }
     }
 
+    /// Deterministic private-channel name for a one-to-one QSO with another
+    /// operator. Both parties derive the same name (callsigns are sorted), so
+    /// either can "Start a QSO" and meet on the same channel.
+    public func qsoChannelName(with otherCallsign: String) -> String {
+        let mine = callsign.uppercased()
+        let theirs = otherCallsign.uppercased()
+        let joined = [mine, theirs].sorted().joined(separator: "-")
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-"))
+        let sanitized = String(joined.unicodeScalars.filter { allowed.contains($0) })
+        return "QSO-\(sanitized)"
+    }
+
     public func setCallsign(_ newCallsign: String) {
         let trimmed = newCallsign.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
