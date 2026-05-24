@@ -5,12 +5,16 @@ import SwiftUI
 
 struct OperatingView: View {
     @EnvironmentObject var session: VailSession
+    @EnvironmentObject var runner: SkedRunner
 
     var body: some View {
         VStack(spacing: 16) {
             statusBar
                 .padding(.horizontal)
                 .padding(.top, 8)
+
+            skedBanner
+                .padding(.horizontal)
 
             channelHeader
 
@@ -41,6 +45,50 @@ struct OperatingView: View {
                     .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var skedBanner: some View {
+        if let run = runner.activeRun {
+            HStack(spacing: 12) {
+                Image(systemName: "calendar.badge.clock")
+                    .foregroundStyle(.green)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Running: \(run.title)")
+                        .font(.subheadline.weight(.semibold))
+                    Text(run.participants.isEmpty
+                         ? "On \(run.channel)"
+                         : "\(run.participants.count) on \(run.channel)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("End") { runner.endActiveRun() }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
+            }
+            .padding()
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        } else if let sked = runner.pendingSked {
+            HStack(spacing: 12) {
+                Image(systemName: "calendar.badge.exclamationmark")
+                    .foregroundStyle(.orange)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Sked: \(sked.title)")
+                        .font(.subheadline.weight(.semibold))
+                    Text("On \(sked.channel)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Dismiss") { runner.dismissPrompt() }
+                    .buttonStyle(.borderless)
+                Button("Join") { runner.join(sked) }
+                    .buttonStyle(.borderedProminent)
+            }
+            .padding()
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
         }
     }
 
