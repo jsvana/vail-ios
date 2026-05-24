@@ -31,6 +31,8 @@ struct ContentView: View {
                 .tabItem { Label("Key", systemImage: "circle.grid.cross") }
             RosterView()
                 .tabItem { Label("Roster", systemImage: "person.3") }
+            NavigationStack { SkedListView() }
+                .tabItem { Label("Skeds", systemImage: "calendar") }
             ChannelPickerView()
                 .tabItem { Label("Channels", systemImage: "list.bullet") }
             NavigationStack { SettingsView() }
@@ -41,6 +43,13 @@ struct ContentView: View {
     private var iPadLayout: some View {
         NavigationSplitView {
             List {
+                Section("Skeds") {
+                    NavigationLink {
+                        SkedListView()
+                    } label: {
+                        Label("Manage skeds", systemImage: "calendar")
+                    }
+                }
                 Section("Channels") { ChannelPickerView() }
                 Section("Roster") { RosterView() }
             }
