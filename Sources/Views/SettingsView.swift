@@ -120,6 +120,11 @@ struct SettingsView: View {
                 LabeledContent("Connected") { Text("\(session.clientCount)") }
                 LabeledContent("State") { Text(stateText) }
                 LabeledContent("Room decoder") { Text(session.roomDecoderEnabled ? "Enabled" : "Disabled") }
+                NavigationLink {
+                    LogView()
+                } label: {
+                    Label("In-app log", systemImage: "doc.text.magnifyingglass")
+                }
             }
 
             Section {

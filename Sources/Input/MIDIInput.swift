@@ -13,7 +13,7 @@ import CoreMIDI
 import Foundation
 import OSLog
 
-private let log = Logger(subsystem: "com.example.VailMorse", category: "midi")
+private let log = Logger(subsystem: "com.jsvana.VailMorse", category: "midi")
 
 public final class MIDIInput {
 

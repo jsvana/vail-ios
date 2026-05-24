@@ -5,7 +5,7 @@
 import Foundation
 import OSLog
 
-private let log = Logger(subsystem: "com.example.VailMorse", category: "protocol")
+private let log = Logger(subsystem: "com.jsvana.VailMorse", category: "protocol")
 
 public actor VailClient {
 
@@ -115,6 +115,7 @@ public actor VailClient {
         isPrivate: Bool = false,
         isDecoder: Bool = false
     ) {
+        appLog(.notice, "protocol", "connect channel=\(channel) private=\(isPrivate) decoder=\(isDecoder) callsign=\(callsign)")
         currentChannel = channel
         currentIsPrivate = isPrivate
         currentIsDecoder = isDecoder
@@ -124,6 +125,7 @@ public actor VailClient {
     }
 
     public func disconnect() async {
+        appLog(.notice, "protocol", "disconnect (user-initiated)")
         wantConnected = false
         keepaliveTask?.cancel()
         keepaliveTask = nil
@@ -159,7 +161,7 @@ public actor VailClient {
     public func transmitTone(durationMs: UInt16, beginLocalMs: Int64) async {
         if disconnectedDueToInactivity {
             // Lazy reconnect on user activity.
-            log.info("Reconnecting due to user TX activity")
+            appLog(.notice, "protocol", "reconnect triggered by TX after inactivity")
             disconnectedDueToInactivity = false
             wantConnected = true
             openSocket()
@@ -193,7 +195,7 @@ public actor VailClient {
         guard !trimmed.isEmpty else { return }
 
         if disconnectedDueToInactivity {
-            log.info("Reconnecting due to user chat activity")
+            appLog(.notice, "protocol", "reconnect triggered by chat after inactivity")
             disconnectedDueToInactivity = false
             wantConnected = true
             openSocket()
@@ -220,9 +222,12 @@ public actor VailClient {
     // MARK: - Socket lifecycle
 
     private func openSocket() {
-        guard wantConnected else { return }
+        guard wantConnected else {
+            appLog(.info, "protocol", "openSocket suppressed (wantConnected=false)")
+            return
+        }
         guard let channel = currentChannel else {
-            log.error("openSocket called with no channel")
+            appLog(.error, "protocol", "openSocket called with no channel")
             return
         }
 
@@ -236,6 +241,7 @@ public actor VailClient {
         keepaliveTask?.cancel()
         keepaliveTask = nil
 
+        appLog(.notice, "protocol", "openSocket channel=\(channel)")
         eventContinuation.yield(.stateChanged(.connecting))
 
         var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)!
@@ -261,7 +267,7 @@ public actor VailClient {
                 try await sendHello()
                 self.markConnected()
             } catch {
-                log.error("sendHello failed: \(error.localizedDescription)")
+                appLog(.error, "protocol", "sendHello failed: \(error.localizedDescription)")
             }
         }
 
@@ -281,6 +287,7 @@ public actor VailClient {
     }
 
     private func markConnected() {
+        appLog(.notice, "protocol", "connected (hello sent OK)")
         eventContinuation.yield(.stateChanged(.connected))
     }
 
@@ -330,13 +337,19 @@ public actor VailClient {
     }
 
     private func handleSocketClose(error: Error) {
-        log.notice("Socket closed: \(error.localizedDescription)")
-        let reason = (error as NSError).userInfo[NSLocalizedDescriptionKey] as? String ?? ""
+        let nsError = error as NSError
+        let reason = nsError.userInfo[NSLocalizedDescriptionKey] as? String ?? ""
+        appLog(
+            .warning,
+            "protocol",
+            "socket closed: \(error.localizedDescription) [domain=\(nsError.domain) code=\(nsError.code) reason=\(reason.isEmpty ? "<empty>" : reason)]"
+        )
 
         keepaliveTask?.cancel()
         keepaliveTask = nil
 
         if reason.lowercased().contains("inactivity") {
+            appLog(.notice, "protocol", "inactivity disconnect — will reconnect on next user action")
             disconnectedDueToInactivity = true
             wantConnected = false
             eventContinuation.yield(.stateChanged(.idleDisconnected))
@@ -344,6 +357,7 @@ public actor VailClient {
             return
         }
 
+        appLog(.notice, "protocol", "scheduling reconnect in 2s")
         eventContinuation.yield(.stateChanged(.reconnecting))
         eventContinuation.yield(.notice("Repeater disconnected. Reconnecting…"))
 

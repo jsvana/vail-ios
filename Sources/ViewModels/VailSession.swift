@@ -14,7 +14,7 @@ import Foundation
 import OSLog
 import SwiftUI
 
-private let log = Logger(subsystem: "com.example.VailMorse", category: "session")
+private let log = Logger(subsystem: "com.jsvana.VailMorse", category: "session")
 
 @MainActor
 public final class VailSession: ObservableObject {

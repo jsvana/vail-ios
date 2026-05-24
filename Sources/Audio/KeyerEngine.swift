@@ -16,7 +16,7 @@
 import AVFoundation
 import OSLog
 
-private let log = Logger(subsystem: "com.example.VailMorse", category: "audio")
+private let log = Logger(subsystem: "com.jsvana.VailMorse", category: "audio")
 
 @MainActor
 public final class KeyerEngine {

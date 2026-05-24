@@ -21,7 +21,7 @@ import CoreMIDI
 import Foundation
 import OSLog
 
-private let log = Logger(subsystem: "com.example.VailMorse", category: "midi.out")
+private let log = Logger(subsystem: "com.jsvana.VailMorse", category: "midi.out")
 
 public actor MIDIOutput {
 
@@ -170,11 +170,27 @@ public actor MIDIOutput {
         let adapter = findVailAdapterDestination()
         destination = adapter ?? 0
         let connected = adapter != nil
-        if connected != isConnected {
+        let stateChanged = connected != isConnected
+        let previous = isConnected
+        if stateChanged {
             isConnected = connected
             onConnectionChange?(connected)
         }
-        log.info("Woke \(destinations.count) MIDI destination(s); adapter \(connected ? "identified" : "not identified")")
+
+        if stateChanged {
+            // Log every enumerated destination on transition so we can see what
+            // CoreMIDI is showing us when the adapter heuristic fails. Includes
+            // manufacturer because some firmwares enumerate as "QT Py M0" /
+            // "Adafruit" rather than "Vail" — see findVailAdapterDestination().
+            let inventory = destinations.map { ref -> String in
+                let name = endpointStringProperty(ref, kMIDIPropertyDisplayName)
+                let mfr = endpointStringProperty(ref, kMIDIPropertyManufacturer)
+                return "{name=\(name.isEmpty ? "?" : name), mfr=\(mfr.isEmpty ? "?" : mfr)}"
+            }.joined(separator: ", ")
+            log.info("Adapter \(previous ? "connected" : "disconnected") -> \(connected ? "connected" : "disconnected"); \(destinations.count) destination(s): [\(inventory, privacy: .public)]")
+        } else {
+            log.debug("Adapter scan: \(destinations.count) destination(s), still \(connected ? "connected" : "disconnected")")
+        }
     }
 
     /// User-triggered retry of the wake/identify sequence (Settings button).
