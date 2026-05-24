@@ -41,6 +41,17 @@ public final class VailSession: ObservableObject {
     @Published public var breakInEnabled: Bool = false {
         didSet { UserDefaults.standard.set(breakInEnabled, forKey: Self.breakInDefaultsKey) }
     }
+    /// When true, channel joins set the protocol `Private` flag and the contact
+    /// presence scanner also probes with `Private: true`. Hides this client's
+    /// rooms from the server's public Rooms list. Defaults to true; toggleable
+    /// from Settings.
+    @Published public var privateMode: Bool = true {
+        didSet {
+            UserDefaults.standard.set(privateMode, forKey: Self.privateModeDefaultsKey)
+            let p = privateMode
+            Task { await client.setPrivate(p) }
+        }
+    }
     @Published public var lastNotice: String?
     @Published public var clientCount: Int = 0
     @Published public var roomDecoderEnabled: Bool = false
@@ -111,6 +122,7 @@ public final class VailSession: ObservableObject {
     private static let keyerModeDefaultsKey = "VailSession.keyerMode"
     private static let keyerWPMDefaultsKey = "VailSession.keyerWPM"
     private static let adapterRxFeedbackDefaultsKey = "VailSession.adapterRxFeedback"
+    private static let privateModeDefaultsKey = "VailSession.privateMode"
 
     public init(initialCallsign: String? = nil) {
         let defaults = UserDefaults.standard
@@ -154,6 +166,9 @@ public final class VailSession: ObservableObject {
         self.adapterRxFeedbackEnabled = defaults.object(forKey: Self.adapterRxFeedbackDefaultsKey) != nil
             ? defaults.bool(forKey: Self.adapterRxFeedbackDefaultsKey)
             : false
+        self.privateMode = defaults.object(forKey: Self.privateModeDefaultsKey) != nil
+            ? defaults.bool(forKey: Self.privateModeDefaultsKey)
+            : true
 
         self.keyer.localTxToneMIDI = resolvedTxTone
     }
@@ -218,8 +233,9 @@ public final class VailSession: ObservableObject {
     }
 
     public func connect() {
+        let isPrivate = privateMode
         Task {
-            await client.connect(channel: channel)
+            await client.connect(channel: channel, isPrivate: isPrivate)
         }
     }
 
@@ -231,9 +247,10 @@ public final class VailSession: ObservableObject {
         channel = name
         chatMessages.removeAll()
         users.removeAll()
+        let isPrivate = privateMode
         Task {
             await client.disconnect()
-            await client.connect(channel: name)
+            await client.connect(channel: name, isPrivate: isPrivate)
         }
     }
 

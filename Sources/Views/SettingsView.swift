@@ -107,6 +107,14 @@ struct SettingsView: View {
                 Text("The adapter powers up as a keyboard. If keying isn't detected, tap \"Wake up adapter\" to switch it into MIDI mode.")
             }
 
+            Section {
+                Toggle("Private mode", isOn: $session.privateMode)
+            } header: {
+                Text("Privacy")
+            } footer: {
+                Text("Hides your channels from the server's public Rooms list and marks contact scans private. Anyone who knows a channel name can still join it.")
+            }
+
             Section("Diagnostics") {
                 LabeledContent("Lag") { Text("\(session.lagMs) ms").monospaced() }
                 LabeledContent("Connected") { Text("\(session.clientCount)") }

@@ -56,11 +56,14 @@ public final class ContactPresenceScanner: ObservableObject {
     /// `targetCallsigns` are the calls we care about (others are ignored).
     /// `liveChannel`/`liveRoster` seed presence for the room the user is
     /// already connected to so we don't probe (and phantom-join) it.
+    /// `isPrivate` sets the protocol `Private` flag on the probe hello so the
+    /// probe doesn't surface in the server's public Rooms list.
     public func scan(
         channels: [String],
         targetCallsigns: Set<String>,
         liveChannel: String? = nil,
-        liveRoster: [String] = []
+        liveRoster: [String] = [],
+        isPrivate: Bool = true
     ) {
         guard !isScanning else { return }
         let targets = Set(targetCallsigns.map { $0.uppercased() })
@@ -72,7 +75,8 @@ public final class ContactPresenceScanner: ObservableObject {
                 channels: channels,
                 targets: targets,
                 liveChannel: liveChannel,
-                liveRoster: liveRoster
+                liveRoster: liveRoster,
+                isPrivate: isPrivate
             )
         }
     }
@@ -89,7 +93,8 @@ public final class ContactPresenceScanner: ObservableObject {
         channels: [String],
         targets: Set<String>,
         liveChannel: String?,
-        liveRoster: [String]
+        liveRoster: [String],
+        isPrivate: Bool
     ) async {
         isScanning = true
         progress = 0
@@ -117,7 +122,11 @@ public final class ContactPresenceScanner: ObservableObject {
                 for channel in batch {
                     group.addTask { [weak self] in
                         guard let self else { return (channel, []) }
-                        let calls = await self.probe(channel: channel, probeCallsign: probeCallsign)
+                        let calls = await self.probe(
+                            channel: channel,
+                            probeCallsign: probeCallsign,
+                            isPrivate: isPrivate
+                        )
                         return (channel, calls)
                     }
                 }
@@ -152,7 +161,7 @@ public final class ContactPresenceScanner: ObservableObject {
 
     /// Connect to one room, read its roster, return the set of callsigns
     /// (uppercased) present. Returns empty on timeout or any failure.
-    private func probe(channel: String, probeCallsign: String) async -> Set<String> {
+    private func probe(channel: String, probeCallsign: String, isPrivate: Bool) async -> Set<String> {
         var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "repeater", value: channel)]
         guard let url = components.url else { return [] }
@@ -177,7 +186,7 @@ public final class ContactPresenceScanner: ObservableObject {
         var hello = VailMessage(timestamp: Int64(Date().timeIntervalSince1970 * 1000))
         hello.callsign = probeCallsign
         hello.txTone = 72
-        hello.private = false
+        hello.private = isPrivate
         hello.decoder = false
         do {
             let data = try JSONEncoder().encode(hello)

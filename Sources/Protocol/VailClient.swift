@@ -148,6 +148,11 @@ public actor VailClient {
         Task { try? await sendHello() }
     }
 
+    public func setPrivate(_ isPrivate: Bool) {
+        currentIsPrivate = isPrivate
+        Task { try? await sendHello() }
+    }
+
     /// Transmit a single tone burst. Call on key-up with the duration of the
     /// tone you just held. See CLAUDE.md §1 — outbound transmissions use a
     /// one-element `Duration: [ms]` array.

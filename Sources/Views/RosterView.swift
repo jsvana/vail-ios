@@ -189,7 +189,8 @@ struct RosterView: View {
             channels: channels.sorted(),
             targetCallsigns: Set(contacts.contacts.map(\.callsign)),
             liveChannel: session.channel,
-            liveRoster: session.users.map(\.callsign)
+            liveRoster: session.users.map(\.callsign),
+            isPrivate: session.privateMode
         )
     }
 
