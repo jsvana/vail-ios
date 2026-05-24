@@ -29,7 +29,7 @@ struct ContentView: View {
         TabView {
             OperatingView()
                 .tabItem { Label("Key", systemImage: "circle.grid.cross") }
-            RosterView()
+            NavigationStack { RosterView() }
                 .tabItem { Label("Roster", systemImage: "person.3") }
             NavigationStack { SkedListView() }
                 .tabItem { Label("Skeds", systemImage: "calendar") }
@@ -51,7 +51,13 @@ struct ContentView: View {
                     }
                 }
                 Section("Channels") { ChannelPickerView() }
-                Section("Roster") { RosterView() }
+                Section("Roster") {
+                    NavigationLink {
+                        RosterView()
+                    } label: {
+                        Label("Roster & contacts", systemImage: "person.3")
+                    }
+                }
             }
             .navigationTitle("Vail")
             .toolbar {

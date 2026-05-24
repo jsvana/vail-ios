@@ -22,6 +22,7 @@ public final class SkedRunner: ObservableObject {
 
     private let store: SkedStore
     private weak var session: VailSession?
+    private weak var contacts: ContactStore?
 
     private var pendingOccurrence: Date?
     /// Occurrences the user has already acted on (joined or dismissed), keyed by
@@ -42,6 +43,10 @@ public final class SkedRunner: ObservableObject {
 
     public func attach(_ session: VailSession) {
         self.session = session
+    }
+
+    public func attachContacts(_ contacts: ContactStore) {
+        self.contacts = contacts
     }
 
     // MARK: - Monitoring
@@ -145,6 +150,7 @@ public final class SkedRunner: ObservableObject {
         run.endedAt = Date()
         run.outcome = .completed
         store.record(run)
+        contacts?.markWorked(callsigns: run.participants)
         activeRun = nil
         stopSampling()
         log.info("Ended sked run \(run.title, privacy: .public)")

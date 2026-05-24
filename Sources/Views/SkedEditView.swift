@@ -5,6 +5,7 @@ import SwiftUI
 
 struct SkedEditView: View {
     @EnvironmentObject var store: SkedStore
+    @EnvironmentObject var contacts: ContactStore
     @Environment(\.dismiss) private var dismiss
 
     private enum RecurrenceKind: String, CaseIterable, Identifiable {
@@ -106,6 +107,21 @@ struct SkedEditView: View {
                 TextField("W6JY, N9HO", text: $callsignsText)
                     .textInputAutocapitalization(.characters)
                     .autocorrectionDisabled()
+                if !availableContacts.isEmpty {
+                    Menu {
+                        ForEach(availableContacts) { contact in
+                            Button {
+                                addCallsign(contact.callsign)
+                            } label: {
+                                Text(contact.name.isEmpty
+                                     ? contact.callsign
+                                     : "\(contact.name) (\(contact.callsign))")
+                            }
+                        }
+                    } label: {
+                        Label("Add from contacts", systemImage: "person.crop.circle.badge.plus")
+                    }
+                }
             }
 
             Section("Notes") {
@@ -158,6 +174,26 @@ struct SkedEditView: View {
         guard !resolvedChannel.isEmpty else { return false }
         if recurrenceKind == .weekly && weekdays.isEmpty { return false }
         return true
+    }
+
+    private var currentCallsignTokens: [String] {
+        callsignsText
+            .split(whereSeparator: { $0 == "," || $0.isWhitespace })
+            .map { String($0).uppercased() }
+    }
+
+    /// Contacts not already listed in the callsigns field.
+    private var availableContacts: [Contact] {
+        let present = Set(currentCallsignTokens)
+        return contacts.contacts.filter { !present.contains($0.callsign) }
+    }
+
+    private func addCallsign(_ callsign: String) {
+        var tokens = currentCallsignTokens
+        let upper = callsign.uppercased()
+        guard !tokens.contains(upper) else { return }
+        tokens.append(upper)
+        callsignsText = tokens.joined(separator: ", ")
     }
 
     private func save() {
