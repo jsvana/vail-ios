@@ -5,7 +5,6 @@
 
 import SwiftUI
 
-// swiftlint:disable:next type_body_length
 struct SignalTimelineView: View {
     @EnvironmentObject var session: VailSession
     @EnvironmentObject var contacts: ContactStore

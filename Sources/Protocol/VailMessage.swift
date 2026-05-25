@@ -83,7 +83,7 @@ public struct VailMessage: Codable, Equatable, Sendable {
         duration = try Self.decode([UInt16].self, from: c, "Duration", "duration") ?? []
         callsign = try Self.decode(String.self, from: c, "Callsign", "callsign")
         txTone = try Self.decode(Int.self, from: c, "TxTone", "txTone")
-        self.`private` = try Self.decode(Bool.self, from: c, "Private", "private")
+        self.private = try Self.decode(Bool.self, from: c, "Private", "private")
         self.decoder = try Self.decode(Bool.self, from: c, "Decoder", "decoder")
         text = try Self.decode(String.self, from: c, "Text", "text")
         clients = try Self.decode(Int.self, from: c, "Clients", "clients")
@@ -109,9 +109,17 @@ public struct VailMessage: Codable, Equatable, Sendable {
     /// Dynamic CodingKey for case-tolerant lookups during decoding.
     private struct AnyKey: CodingKey {
         var stringValue: String
-        var intValue: Int? { nil }
-        init?(stringValue: String) { self.stringValue = stringValue }
-        init?(intValue _: Int) { nil }
+        var intValue: Int? {
+            nil
+        }
+
+        init?(stringValue: String) {
+            self.stringValue = stringValue
+        }
+
+        init?(intValue _: Int) {
+            nil
+        }
     }
 
     public struct UserInfo: Codable, Equatable, Sendable, Hashable {

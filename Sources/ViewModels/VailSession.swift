@@ -40,6 +40,14 @@ public final class VailSession: ObservableObject {
     @Published public var users: [VailMessage.UserInfo] = []
     @Published public var rooms: [VailMessage.Room] = []
     @Published public var chatMessages: [ChatMessage] = []
+    /// Count of chat messages received while the chat view was not active.
+    /// Drives the tab badge. Reset when the chat view appears or the user
+    /// switches channels.
+    @Published public var unreadChatCount: Int = 0
+    /// Set by ChatView via onAppear/onDisappear. While true, incoming chat
+    /// messages do not increment `unreadChatCount` — the user is looking
+    /// right at them.
+    public var isChatViewActive: Bool = false
     /// Rolling log of keyed-tone bursts and chat events for the on-screen
     /// timeline visualizer. Capped at `maxSignalEvents`.
     @Published public var signalEvents: [SignalEvent] = []
@@ -124,8 +132,8 @@ public final class VailSession: ObservableObject {
     /// for cases where the server doesn't push a fresh roster after a user
     /// leaves (channel switch races, brief network blips, etc.).
     private var userLastSeenMs: [String: Int64] = [:]
-    public static let userTtlMs: Int64 = 60_000
-    public static let userPruneIntervalMs: Int64 = 10_000
+    public static let userTtlMs: Int64 = 60000
+    public static let userPruneIntervalMs: Int64 = 10000
 
     /// Per-key TX state.
     private struct KeyState {
@@ -294,6 +302,7 @@ public final class VailSession: ObservableObject {
     public func switchChannel(_ name: String) {
         channel = name
         chatMessages.removeAll()
+        unreadChatCount = 0
         users.removeAll()
         signalEvents.removeAll()
         liveOwnKeyStarts.removeAll()
@@ -354,6 +363,11 @@ public final class VailSession: ObservableObject {
             ))
         }
         Task { await client.sendChat(text) }
+    }
+
+    /// Clear the unread chat badge. ChatView calls this on appear.
+    public func markChatRead() {
+        unreadChatCount = 0
     }
 
     // MARK: - Signal timeline
@@ -492,6 +506,7 @@ public final class VailSession: ObservableObject {
                 // preserve history.
                 if let last = lastConnectedChannel, last != channel {
                     chatMessages.removeAll()
+                    unreadChatCount = 0
                     signalEvents.removeAll()
                     liveOwnKeyStarts.removeAll()
                 }
@@ -525,6 +540,9 @@ public final class VailSession: ObservableObject {
             chatMessages.append(ChatMessage(text: text, callsign: cs, timestampMs: ts))
             // Cap chat history to avoid unbounded growth.
             if chatMessages.count > 500 { chatMessages.removeFirst(chatMessages.count - 500) }
+            if !isChatViewActive, cs != callsign {
+                unreadChatCount += 1
+            }
             recordSignal(SignalEvent(
                 callsign: cs ?? "?",
                 startLocalMs: ts,

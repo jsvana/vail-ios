@@ -1,0 +1,109 @@
+# SwiftLint config for VailMorse.
+# xc lint runs with --strict (warnings = errors), so these thresholds are
+# tuned to match what we actually want to fail on.
+
+identifier_name:
+  min_length:
+    warning: 1
+    error: 1
+  max_length:
+    warning: 60
+    error: 80
+  excluded:
+    # Common short names used throughout the codebase; flagging these
+    # produces noise, not bugs.
+    - id
+    - at
+    - on
+    - in
+    - to
+    - up
+    - ms
+    - cs
+    - ts
+    - tx
+    - rx
+    - dt
+    - dr
+    - ec
+    - eq
+    - fn
+    - fp
+    - hz
+    - ix
+    - kb
+    - mb
+    - mb
+    - ms
+    - no
+    - ns
+    - pi
+    - qs
+    - rs
+    - rx
+    - sd
+    - sp
+    - tx
+    - ui
+    - vc
+    - vm
+    - x0
+    - y0
+    - x1
+    - y1
+    - i
+    - j
+    - k
+    - n
+    - m
+    - p
+    - r
+    - s
+    - t
+    - u
+
+line_length:
+  warning: 140
+  error: 200
+  ignores_comments: true
+  ignores_urls: true
+
+file_length:
+  warning: 800
+  error: 1200
+  ignore_comment_only_lines: true
+
+type_body_length:
+  warning: 500
+  error: 700
+
+function_body_length:
+  warning: 110
+  error: 150
+
+cyclomatic_complexity:
+  warning: 20
+  error: 30
+
+function_parameter_count:
+  warning: 10
+  error: 12
+
+nesting:
+  type_level:
+    warning: 2
+    error: 3
+  function_level:
+    warning: 3
+    error: 5
+
+disabled_rules:
+  # SwiftFormat enforces trailing commas in multi-line collection literals.
+  # Keeping the lint rule on causes format -> lint to oscillate.
+  - trailing_comma
+  # SwiftFormat's wrapMultilineStatementBraces wraps `{` to its own line for
+  # multi-line if conditions, which conflicts with this rule.
+  - opening_brace
+
+# Kept enabled with defaults — they catch real issues:
+# inclusive_language

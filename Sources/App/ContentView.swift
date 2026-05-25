@@ -29,10 +29,11 @@ struct ContentView: View {
         TabView {
             OperatingView()
                 .tabItem { Label("Key", systemImage: "circle.grid.cross") }
-            NavigationStack { ContactsView() }
-                .tabItem { Label("Contacts", systemImage: "person.crop.circle") }
-            NavigationStack { SkedListView() }
-                .tabItem { Label("Skeds", systemImage: "calendar") }
+            NavigationStack { ChatView() }
+                .tabItem { Label("Chat", systemImage: "bubble.left.and.bubble.right") }
+                .badge(session.unreadChatCount)
+            NavigationStack { RosterView() }
+                .tabItem { Label("Roster", systemImage: "person.crop.circle") }
             ChannelPickerView()
                 .tabItem { Label("Channels", systemImage: "list.bullet") }
             NavigationStack { SettingsView() }
@@ -43,21 +44,32 @@ struct ContentView: View {
     private var iPadLayout: some View {
         NavigationSplitView {
             List {
-                Section("Skeds") {
+                Section("Chat") {
                     NavigationLink {
-                        SkedListView()
+                        ChatView()
                     } label: {
-                        Label("Manage skeds", systemImage: "calendar")
+                        HStack {
+                            Label("Channel chat", systemImage: "bubble.left.and.bubble.right")
+                            Spacer()
+                            if session.unreadChatCount > 0 {
+                                Text("\(session.unreadChatCount)")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 2)
+                                    .background(Capsule().fill(Color.red))
+                            }
+                        }
+                    }
+                }
+                Section("Roster") {
+                    NavigationLink {
+                        RosterView()
+                    } label: {
+                        Label("Contacts & skeds", systemImage: "person.crop.circle")
                     }
                 }
                 Section("Channels") { ChannelPickerView() }
-                Section("Contacts") {
-                    NavigationLink {
-                        ContactsView()
-                    } label: {
-                        Label("Saved contacts", systemImage: "person.crop.circle")
-                    }
-                }
             }
             .navigationTitle("Vail")
             .toolbar {

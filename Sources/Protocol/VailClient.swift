@@ -362,7 +362,12 @@ public actor VailClient {
         appLog(
             .warning,
             "protocol",
-            "socket closed: \(error.localizedDescription) [domain=\(nsError.domain) code=\(nsError.code) reason=\(reason.isEmpty ? "<empty>" : reason) wsCode=\(wsCode) wsReason=\(wsReason)]"
+            """
+            socket closed: \(error.localizedDescription) \
+            [domain=\(nsError.domain) code=\(nsError.code) \
+            reason=\(reason.isEmpty ? "<empty>" : reason) \
+            wsCode=\(wsCode) wsReason=\(wsReason)]
+            """
         )
 
         keepaliveTask?.cancel()

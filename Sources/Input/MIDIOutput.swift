@@ -136,7 +136,8 @@ public actor MIDIOutput {
         config.ditDurationMs = Self.ditDurationMs(forWPM: wpm)
         guard destination != 0 else { return }
         send([0xB0, 0x01, UInt8(min(127, config.ditDurationMs / 2))], to: destination)
-        log.info("Set keyer speed \(wpm) WPM (dit \(self.config.ditDurationMs)ms)")
+        let dit = config.ditDurationMs
+        log.info("Set keyer speed \(wpm) WPM (dit \(dit)ms)")
     }
 
     public func setSidetone(midiNote: Int) {
@@ -186,7 +187,9 @@ public actor MIDIOutput {
                 let mfr = endpointStringProperty(ref, kMIDIPropertyManufacturer)
                 return "{name=\(name.isEmpty ? "?" : name), mfr=\(mfr.isEmpty ? "?" : mfr)}"
             }.joined(separator: ", ")
-            log.info("Adapter \(previous ? "connected" : "disconnected") -> \(connected ? "connected" : "disconnected"); \(destinations.count) destination(s): [\(inventory, privacy: .public)]")
+            let prev = previous ? "connected" : "disconnected"
+            let now = connected ? "connected" : "disconnected"
+            log.info("Adapter \(prev) -> \(now); \(destinations.count) destination(s): [\(inventory, privacy: .public)]")
         } else {
             log.debug("Adapter scan: \(destinations.count) destination(s), still \(connected ? "connected" : "disconnected")")
         }

@@ -132,7 +132,13 @@ struct SettingsView: View {
             } header: {
                 Text("Privacy")
             } footer: {
-                Text("Hides your channels from the server's public Rooms list and marks contact scans private. Anyone who knows a channel name can still join it.")
+                Text(
+                    """
+                    Hides your channels from the server's public Rooms list and \
+                    marks contact scans private. Anyone who knows a channel \
+                    name can still join it.
+                    """
+                )
             }
 
             Section("Diagnostics") {

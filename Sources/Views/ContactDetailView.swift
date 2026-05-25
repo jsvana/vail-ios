@@ -126,7 +126,13 @@ struct ContactDetailView: View {
                 }
             }
         } footer: {
-            Text("Moves you to a private channel named from both callsigns. \(current.displayName) lands on the same name if they Start a QSO with you.")
+            Text(
+                """
+                Moves you to a private channel named from both callsigns. \
+                \(current.displayName) lands on the same name if they Start \
+                a QSO with you.
+                """
+            )
         }
     }
 

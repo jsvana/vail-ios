@@ -27,7 +27,7 @@ public final class KeyerEngine {
     public nonisolated static let envelopeRampMs: Double = 5
 
     /// Master peak amplitude. 0.5 matches the web client's `txGain`.
-    public nonisolated static let masterAmplitude: Float = 0.5
+    public nonisolated static let peakAmplitude: Float = 0.5
 
     // MARK: - Public state
 
@@ -73,7 +73,8 @@ public final class KeyerEngine {
         engine.connect(txGenerator.node, to: mixer, format: monoFormat)
 
         try engine.start()
-        log.info("Audio engine started at \(self.sampleRate) Hz")
+        let rate = sampleRate
+        log.info("Audio engine started at \(rate) Hz")
     }
 
     public func stop() {
@@ -181,7 +182,7 @@ public final class KeyerEngine {
 
         let ptr = buffer.floatChannelData![0]
         let omega = 2.0 * .pi * frequency / sampleRate
-        let amp = Self.masterAmplitude
+        let amp = Self.peakAmplitude
         let total = Int(frames)
 
         for i in 0 ..< total {
@@ -257,7 +258,7 @@ private final class ToneGenerator {
             let ptr = buffer.mData!.assumingMemoryBound(to: Float.self)
 
             lockRef.lock()
-            let target: Float = stateRef.keyDown ? KeyerEngine.masterAmplitude : 0
+            let target: Float = stateRef.keyDown ? KeyerEngine.peakAmplitude : 0
             let freq = stateRef.frequency
             let sampleRate = stateRef.sampleRate
             var phase = stateRef.phase
@@ -267,8 +268,8 @@ private final class ToneGenerator {
             // Linear ramp toward target. 5ms at sampleRate = rampFrames samples.
             let rampFrames = Float(KeyerEngine.envelopeRampMs * sampleRate / 1000.0)
             let perSampleStep: Float = target > gain
-                ? (KeyerEngine.masterAmplitude / rampFrames)
-                : -(KeyerEngine.masterAmplitude / rampFrames)
+                ? (KeyerEngine.peakAmplitude / rampFrames)
+                : -(KeyerEngine.peakAmplitude / rampFrames)
 
             let omega = 2.0 * .pi * freq / sampleRate
             let twoPi = 2.0 * .pi
