@@ -36,6 +36,13 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         CFBundleDisplayName: Vail
+        CFBundleShortVersionString: "1.2"
+        CFBundleVersion: "3"
+        # Declares the app uses only encryption exempt under US export
+        # regulations (TLS via URLSession / WebSocket). Setting this here
+        # makes App Store Connect skip the encryption question on every
+        # release. See https://developer.apple.com/documentation/security/complying_with_encryption_export_regulations
+        ITSAppUsesNonExemptEncryption: false
         # Uncomment when adding background audio:
         # UIBackgroundModes:
         #   - audio
