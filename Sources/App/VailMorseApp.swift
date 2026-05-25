@@ -55,6 +55,11 @@ struct VailMorseApp: App {
     @StateObject private var contactStore = ContactStore()
     @StateObject private var presenceScanner = ContactPresenceScanner()
 
+    @AppStorage("appTheme") private var themeRaw: String = AppTheme.quiet.rawValue
+    private var theme: AppTheme {
+        AppTheme(rawValue: themeRaw) ?? .quiet
+    }
+
     private let skedNotifier: SkedNotifier
 
     init() {
@@ -73,6 +78,7 @@ struct VailMorseApp: App {
                 .environmentObject(skedRunner)
                 .environmentObject(contactStore)
                 .environmentObject(presenceScanner)
+                .appThemeRoot(theme)
                 .onAppear {
                     session.start()
                     session.connect()

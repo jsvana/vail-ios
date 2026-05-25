@@ -5,11 +5,19 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var session: VailSession
+    @AppStorage("appTheme") private var themeRaw: String = AppTheme.quiet.rawValue
     @State private var callsignField: String = ""
     @State private var txToneField: Double = 72
     @State private var rxDelayField: Double = 2000
     @State private var keyerWPMField: Double = 20
     @FocusState private var callsignFocused: Bool
+
+    private var themeBinding: Binding<AppTheme> {
+        Binding(
+            get: { AppTheme(rawValue: themeRaw) ?? .quiet },
+            set: { themeRaw = $0.rawValue }
+        )
+    }
 
     var body: some View {
         Form {
@@ -27,6 +35,18 @@ struct SettingsView: View {
                 }
                 Button("Apply callsign") { commitCallsign() }
                     .disabled(callsignField.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+
+            Section {
+                Picker("Theme", selection: themeBinding) {
+                    ForEach(AppTheme.allCases) { theme in
+                        Text(theme.displayName).tag(theme)
+                    }
+                }
+            } header: {
+                Text("Appearance")
+            } footer: {
+                Text(themeBinding.wrappedValue.tagline)
             }
 
             Section("TX Tone") {
