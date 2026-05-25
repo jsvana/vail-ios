@@ -136,7 +136,7 @@ public actor MIDIOutput {
         config.ditDurationMs = Self.ditDurationMs(forWPM: wpm)
         guard destination != 0 else { return }
         send([0xB0, 0x01, UInt8(min(127, config.ditDurationMs / 2))], to: destination)
-        log.info("Set keyer speed \(wpm) WPM (dit \(config.ditDurationMs)ms)")
+        log.info("Set keyer speed \(wpm) WPM (dit \(self.config.ditDurationMs)ms)")
     }
 
     public func setSidetone(midiNote: Int) {

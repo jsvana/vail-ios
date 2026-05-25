@@ -71,6 +71,49 @@ public struct VailMessage: Codable, Equatable, Sendable {
         self.text = text
     }
 
+    /// Case-tolerant decoding. The envelope historically uses capitalized
+    /// keys (`Callsign`, `TxTone`, ...) but the server has been observed to
+    /// emit lowercase forms on at least some message paths (the `UsersInfo`
+    /// item shape uses lowercase, and relayed tone messages have started
+    /// arriving without an uppercase `Callsign`). Accept both so callsigns
+    /// survive round-tripping.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: AnyKey.self)
+        timestamp = try Self.decode(Int64.self, from: c, "Timestamp", "timestamp") ?? 0
+        duration = try Self.decode([UInt16].self, from: c, "Duration", "duration") ?? []
+        callsign = try Self.decode(String.self, from: c, "Callsign", "callsign")
+        txTone = try Self.decode(Int.self, from: c, "TxTone", "txTone")
+        self.`private` = try Self.decode(Bool.self, from: c, "Private", "private")
+        self.decoder = try Self.decode(Bool.self, from: c, "Decoder", "decoder")
+        text = try Self.decode(String.self, from: c, "Text", "text")
+        clients = try Self.decode(Int.self, from: c, "Clients", "clients")
+        users = try Self.decode([String].self, from: c, "Users", "users")
+        usersInfo = try Self.decode([UserInfo].self, from: c, "UsersInfo", "usersInfo")
+        rooms = try Self.decode([Room].self, from: c, "Rooms", "rooms")
+    }
+
+    private static func decode<T: Decodable>(
+        _ type: T.Type,
+        from container: KeyedDecodingContainer<AnyKey>,
+        _ keys: String...
+    ) throws -> T? {
+        for k in keys {
+            guard let key = AnyKey(stringValue: k) else { continue }
+            if container.contains(key) {
+                return try container.decodeIfPresent(type, forKey: key)
+            }
+        }
+        return nil
+    }
+
+    /// Dynamic CodingKey for case-tolerant lookups during decoding.
+    private struct AnyKey: CodingKey {
+        var stringValue: String
+        var intValue: Int? { nil }
+        init?(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue _: Int) { nil }
+    }
+
     public struct UserInfo: Codable, Equatable, Sendable, Hashable {
         public let callsign: String
         public let txTone: Int?

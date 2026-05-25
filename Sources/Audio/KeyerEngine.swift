@@ -73,7 +73,7 @@ public final class KeyerEngine {
         engine.connect(txGenerator.node, to: mixer, format: monoFormat)
 
         try engine.start()
-        log.info("Audio engine started at \(sampleRate) Hz")
+        log.info("Audio engine started at \(self.sampleRate) Hz")
     }
 
     public func stop() {

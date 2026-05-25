@@ -117,6 +117,15 @@ public final class VailSession: ObservableObject {
     private var midi: MIDIInput?
     private var midiOutput: MIDIOutput?
     private var clientEventTask: Task<Void, Never>?
+    private var rosterPruneTask: Task<Void, Never>?
+
+    /// Last local-clock ms we saw each callsign in a roster snapshot. Pruning
+    /// drops users whose entry is older than `userTtlMs`. This is a backstop
+    /// for cases where the server doesn't push a fresh roster after a user
+    /// leaves (channel switch races, brief network blips, etc.).
+    private var userLastSeenMs: [String: Int64] = [:]
+    public static let userTtlMs: Int64 = 60_000
+    public static let userPruneIntervalMs: Int64 = 10_000
 
     /// Per-key TX state.
     private struct KeyState {
@@ -130,6 +139,12 @@ public final class VailSession: ObservableObject {
         .dah: KeyState(),
     ]
     private var stuckKeyTask: Task<Void, Never>?
+
+    /// The channel of the most recent successful connection. Used on
+    /// `.connecting` to tell a channel switch (where roster, signal events,
+    /// and chat are no longer relevant) apart from a plain network-blip
+    /// reconnect (where they are).
+    private var lastConnectedChannel: String?
 
     /// Auto-disable break-in if a key has been down for >10s.
     /// Matches the web client's stuck-key safety.
@@ -242,11 +257,23 @@ public final class VailSession: ObservableObject {
                 }
             }
         }
+
+        rosterPruneTask?.cancel()
+        let interval = Self.userPruneIntervalMs
+        rosterPruneTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(Int(interval)))
+                if Task.isCancelled { return }
+                await MainActor.run { self?.pruneStaleUsers() }
+            }
+        }
     }
 
     public func stop() {
         clientEventTask?.cancel()
         clientEventTask = nil
+        rosterPruneTask?.cancel()
+        rosterPruneTask = nil
         stuckKeyTask?.cancel()
         stuckKeyTask = nil
         Task { await client.disconnect() }
@@ -254,9 +281,9 @@ public final class VailSession: ObservableObject {
     }
 
     public func connect() {
-        let isPrivate = privateMode
+        let (isPrivate, isDecoder) = Self.flags(for: channel, defaultPrivate: privateMode)
         Task {
-            await client.connect(channel: channel, isPrivate: isPrivate)
+            await client.connect(channel: channel, isPrivate: isPrivate, isDecoder: isDecoder)
         }
     }
 
@@ -268,11 +295,25 @@ public final class VailSession: ObservableObject {
         channel = name
         chatMessages.removeAll()
         users.removeAll()
-        let isPrivate = privateMode
+        signalEvents.removeAll()
+        liveOwnKeyStarts.removeAll()
+        let (isPrivate, isDecoder) = Self.flags(for: name, defaultPrivate: privateMode)
         Task {
             await client.disconnect()
-            await client.connect(channel: name, isPrivate: isPrivate)
+            await client.connect(channel: name, isPrivate: isPrivate, isDecoder: isDecoder)
         }
+    }
+
+    /// Channel-specific overrides for the hello flags. The "Decoder" room
+    /// drops us immediately (POSIX 57 ENOTCONN right after the hello) when
+    /// we send the defaults; both Decoder=true (it's a server-side-decoder
+    /// room) and Private=false (it's a public broadcast room) are plausible
+    /// requirements, so we set both for that channel.
+    private static func flags(for channel: String, defaultPrivate: Bool) -> (isPrivate: Bool, isDecoder: Bool) {
+        if channel.caseInsensitiveCompare("Decoder") == .orderedSame {
+            return (false, true)
+        }
+        return (defaultPrivate, false)
     }
 
     /// Deterministic private-channel name for a one-to-one QSO with another
@@ -436,6 +477,28 @@ public final class VailSession: ObservableObject {
         switch event {
         case let .stateChanged(s):
             connectionState = s
+            // A fresh socket invalidates whatever roster we had from the
+            // previous channel/session. Clearing here (rather than in
+            // switchChannel) closes a race: any stale roster event from the
+            // old socket that was still in the AsyncStream gets processed
+            // BEFORE this state transition, then we wipe before the new
+            // socket's hello-response roster lands.
+            if s == .connecting {
+                users.removeAll()
+                userLastSeenMs.removeAll()
+                // Channel-scoped buffers (chat, activity timeline) only get
+                // wiped if we're actually moving to a different channel.
+                // Reconnect-after-blip stays on the same channel and should
+                // preserve history.
+                if let last = lastConnectedChannel, last != channel {
+                    chatMessages.removeAll()
+                    signalEvents.removeAll()
+                    liveOwnKeyStarts.removeAll()
+                }
+            }
+            if s == .connected {
+                lastConnectedChannel = channel
+            }
 
         case let .tone(at, durationMs, fromCallsign, txTone):
             let note = txTone ?? 69
@@ -471,6 +534,13 @@ public final class VailSession: ObservableObject {
 
         case let .roster(userList, roomList):
             users = userList
+            let now = Int64(Date().timeIntervalSince1970 * 1000)
+            // Refresh last-seen for every callsign in the snapshot; do NOT
+            // touch entries for callsigns not in the snapshot. The prune
+            // task drops those once they age out past userTtlMs.
+            for u in userList {
+                userLastSeenMs[u.callsign] = now
+            }
             if let r = roomList { rooms = r }
             clientCount = userList.count
 
@@ -484,6 +554,28 @@ public final class VailSession: ObservableObject {
 
         case let .notice(text):
             lastNotice = text
+        }
+    }
+
+    // MARK: - Roster pruning
+
+    /// Drop users from the local roster whose last-seen timestamp is older
+    /// than `userTtlMs`. Server roster snapshots are full replacements, so in
+    /// the steady state this never trims anything — it only catches stragglers
+    /// from a stale snapshot the server forgot to update.
+    private func pruneStaleUsers() {
+        guard !users.isEmpty else { return }
+        let now = Int64(Date().timeIntervalSince1970 * 1000)
+        let ttl = Self.userTtlMs
+        let alive = users.filter { user in
+            guard let seen = userLastSeenMs[user.callsign] else { return false }
+            return now - seen <= ttl
+        }
+        if alive.count != users.count {
+            users = alive
+            for (cs, _) in userLastSeenMs where !alive.contains(where: { $0.callsign == cs }) {
+                userLastSeenMs.removeValue(forKey: cs)
+            }
         }
     }
 

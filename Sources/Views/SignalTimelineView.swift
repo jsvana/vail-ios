@@ -7,6 +7,7 @@ import SwiftUI
 
 struct SignalTimelineView: View {
     @EnvironmentObject var session: VailSession
+    @EnvironmentObject var contacts: ContactStore
 
     /// How many ms wide the visible window is. 30s gives enough room to see a
     /// short exchange without bars becoming pixel-thin.
@@ -83,7 +84,13 @@ struct SignalTimelineView: View {
         let events = session.signalEvents
         let liveStarts = session.liveOwnKeyStarts
         let own = session.callsign
-        let lanes = laneOrder(events: events, ownCallsign: own, hasLiveOwn: !liveStarts.isEmpty)
+        let roster = session.users.map(\.callsign)
+        let lanes = laneOrder(
+            events: events,
+            ownCallsign: own,
+            hasLiveOwn: !liveStarts.isEmpty,
+            roster: roster
+        )
 
         if lanes.isEmpty {
             emptyState
@@ -138,7 +145,8 @@ struct SignalTimelineView: View {
     private func labelColumn(lanes: [String]) -> some View {
         VStack(alignment: .leading, spacing: rowSpacing) {
             ForEach(lanes, id: \.self) { call in
-                HStack(spacing: 6) {
+                let contact = contacts.contact(forCallsign: call)
+                HStack(spacing: 4) {
                     Circle()
                         .fill(color(for: call))
                         .frame(width: 8, height: 8)
@@ -147,6 +155,12 @@ struct SignalTimelineView: View {
                         .lineLimit(1)
                         .truncationMode(.tail)
                         .foregroundStyle(call == session.callsign ? .primary : .secondary)
+                    if let contact {
+                        Image(systemName: contact.isFavorite ? "star.fill" : "person.crop.circle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(contact.isFavorite ? .yellow : .blue)
+                            .accessibilityLabel(contact.isFavorite ? "Favorite contact" : "Saved contact")
+                    }
                 }
                 .frame(height: rowHeight, alignment: .leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -342,30 +356,49 @@ struct SignalTimelineView: View {
 
     // MARK: - Lane ordering
 
-    /// Lanes are sorted by most recent activity, descending. The local
-    /// callsign is pinned at the top when it has any activity (completed or
-    /// in-progress).
-    private func laneOrder(events: [SignalEvent], ownCallsign: String, hasLiveOwn: Bool) -> [String] {
+    /// Lane composition:
+    ///   1. Own callsign first (always, when set — even with zero activity, so
+    ///      the operator always sees their own lane ready to fill).
+    ///   2. Everyone with activity in the window, sorted by most recent.
+    ///   3. Remaining roster members (connected but quiet), sorted alphabetically.
+    ///
+    /// The activity timeline doubles as the "who's on the channel" surface
+    /// now that the Roster tab is gone, so every connected user gets a lane.
+    private func laneOrder(
+        events: [SignalEvent],
+        ownCallsign: String,
+        hasLiveOwn: Bool,
+        roster: [String]
+    ) -> [String] {
         var lastSeen: [String: Int64] = [:]
         for e in events {
             let t = e.endLocalMs
             if let prev = lastSeen[e.callsign], prev >= t { continue }
             lastSeen[e.callsign] = t
         }
-        let own = ownCallsign
-        var ownActive = lastSeen[own] != nil
-        if !own.isEmpty, hasLiveOwn, !ownActive {
-            lastSeen[own] = .max
-            ownActive = true
+        if !ownCallsign.isEmpty, hasLiveOwn, lastSeen[ownCallsign] == nil {
+            lastSeen[ownCallsign] = .max
         }
-        let others = lastSeen.keys
-            .filter { $0 != own }
-            .sorted { (lastSeen[$0] ?? 0) > (lastSeen[$1] ?? 0) }
+
+        var seen = Set<String>()
         var result: [String] = []
-        if !own.isEmpty, ownActive {
-            result.append(own)
+
+        if !ownCallsign.isEmpty {
+            result.append(ownCallsign)
+            seen.insert(ownCallsign)
         }
-        result.append(contentsOf: others)
+
+        let active = lastSeen.keys
+            .filter { $0 != ownCallsign }
+            .sorted { (lastSeen[$0] ?? 0) > (lastSeen[$1] ?? 0) }
+        for c in active where !seen.contains(c) {
+            result.append(c)
+            seen.insert(c)
+        }
+
+        let quiet = roster.filter { !seen.contains($0) }.sorted()
+        result.append(contentsOf: quiet)
+
         return result
     }
 

@@ -29,8 +29,8 @@ struct ContentView: View {
         TabView {
             OperatingView()
                 .tabItem { Label("Key", systemImage: "circle.grid.cross") }
-            NavigationStack { RosterView() }
-                .tabItem { Label("Roster", systemImage: "person.3") }
+            NavigationStack { ContactsView() }
+                .tabItem { Label("Contacts", systemImage: "person.crop.circle") }
             NavigationStack { SkedListView() }
                 .tabItem { Label("Skeds", systemImage: "calendar") }
             ChannelPickerView()
@@ -51,11 +51,11 @@ struct ContentView: View {
                     }
                 }
                 Section("Channels") { ChannelPickerView() }
-                Section("Roster") {
+                Section("Contacts") {
                     NavigationLink {
-                        RosterView()
+                        ContactsView()
                     } label: {
-                        Label("Roster & contacts", systemImage: "person.3")
+                        Label("Saved contacts", systemImage: "person.crop.circle")
                     }
                 }
             }

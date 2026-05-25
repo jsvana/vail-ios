@@ -325,12 +325,28 @@ public actor VailClient {
                 guard let data else { continue }
                 do {
                     let msg = try JSONDecoder().decode(VailMessage.self, from: data)
+                    // Diagnostic: surface tone messages that carry tone data
+                    // but no attributable callsign — those land as "?" in the
+                    // timeline. Logging the raw frame lets us see if the
+                    // server's key naming has drifted again.
+                    if !msg.duration.isEmpty, msg.callsign == nil, msg.text == nil {
+                        let preview = String(data: data, encoding: .utf8) ?? "<binary>"
+                        appLog(.warning, "protocol", "tone w/o callsign: \(preview.prefix(240))")
+                    }
                     handle(msg)
                 } catch {
                     log.error("Failed to decode message: \(error.localizedDescription)")
                 }
             }
         } catch {
+            // Our own cancellation (disconnect, reconnect, channel switch)
+            // throws CancellationError out of `task.receive()`. That is not
+            // a server-side close and must not trigger the reconnect path,
+            // or we end up in a reconnect storm where every channel switch
+            // races a stale reconnect against the fresh socket.
+            if Task.isCancelled || error is CancellationError {
+                return
+            }
             handleSocketClose(error: error)
         }
     }
@@ -338,14 +354,28 @@ public actor VailClient {
     private func handleSocketClose(error: Error) {
         let nsError = error as NSError
         let reason = nsError.userInfo[NSLocalizedDescriptionKey] as? String ?? ""
+        let wsCode = task?.closeCode.rawValue ?? -1
+        let wsReason: String = {
+            guard let data = task?.closeReason, !data.isEmpty else { return "<none>" }
+            return String(data: data, encoding: .utf8) ?? "<\(data.count) bytes>"
+        }()
         appLog(
             .warning,
             "protocol",
-            "socket closed: \(error.localizedDescription) [domain=\(nsError.domain) code=\(nsError.code) reason=\(reason.isEmpty ? "<empty>" : reason)]"
+            "socket closed: \(error.localizedDescription) [domain=\(nsError.domain) code=\(nsError.code) reason=\(reason.isEmpty ? "<empty>" : reason) wsCode=\(wsCode) wsReason=\(wsReason)]"
         )
 
         keepaliveTask?.cancel()
         keepaliveTask = nil
+
+        // If the user (or a channel switch) tore us down deliberately,
+        // wantConnected is false. Don't schedule a reconnect — a fresh
+        // connect() is either already in flight or is the user's choice
+        // not to be connected.
+        guard wantConnected else {
+            appLog(.notice, "protocol", "socket closed during teardown; not reconnecting")
+            return
+        }
 
         if reason.lowercased().contains("inactivity") {
             appLog(.notice, "protocol", "inactivity disconnect — will reconnect on next user action")
