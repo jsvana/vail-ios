@@ -35,7 +35,7 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        CFBundleDisplayName: Vail
+        CFBundleDisplayName: Vail Morse
         CFBundleShortVersionString: "1.2"
         CFBundleVersion: "3"
         # Declares the app uses only encryption exempt under US export
