@@ -8,7 +8,7 @@ struct OperatingView: View {
     @EnvironmentObject var runner: SkedRunner
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 12) {
             statusBar
                 .padding(.horizontal)
                 .padding(.top, 8)
@@ -18,13 +18,12 @@ struct OperatingView: View {
 
             channelHeader
 
-            Spacer()
+            SignalTimelineView()
+                .padding(.horizontal)
 
             TouchKeyView()
-                .frame(maxWidth: 400, maxHeight: 400)
-                .padding()
-
-            Spacer()
+                .frame(maxWidth: 420, maxHeight: 220)
+                .padding(.horizontal)
 
             controlsBar
                 .padding(.horizontal)
@@ -58,8 +57,8 @@ struct OperatingView: View {
                     Text("Running: \(run.title)")
                         .font(.subheadline.weight(.semibold))
                     Text(run.participants.isEmpty
-                         ? "On \(run.channel)"
-                         : "\(run.participants.count) on \(run.channel)")
+                        ? "On \(run.channel)"
+                        : "\(run.participants.count) on \(run.channel)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

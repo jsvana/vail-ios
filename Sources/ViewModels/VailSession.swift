@@ -18,29 +18,48 @@ private let log = Logger(subsystem: "com.jsvana.VailMorse", category: "session")
 
 @MainActor
 public final class VailSession: ObservableObject {
-
     // MARK: - Published state
 
     @Published public var connectionState: VailClient.ConnectionState = .disconnected
     @Published public var channel: String = "General" {
         didSet { UserDefaults.standard.set(channel, forKey: Self.channelDefaultsKey) }
     }
+
     @Published public var callsign: String = "" {
         didSet { UserDefaults.standard.set(callsign, forKey: Self.callsignDefaultsKey) }
     }
+
     @Published public var txTone: Int = 72 {
         didSet { UserDefaults.standard.set(txTone, forKey: Self.txToneDefaultsKey) }
     }
+
     @Published public var rxDelayMs: Int = 2000 {
         didSet { UserDefaults.standard.set(rxDelayMs, forKey: Self.rxDelayDefaultsKey) }
     }
+
     @Published public var users: [VailMessage.UserInfo] = []
     @Published public var rooms: [VailMessage.Room] = []
     @Published public var chatMessages: [ChatMessage] = []
+    /// Rolling log of keyed-tone bursts and chat events for the on-screen
+    /// timeline visualizer. Capped at `maxSignalEvents`.
+    @Published public var signalEvents: [SignalEvent] = []
+    public static let maxSignalEvents = 5000
+
+    /// Start times (local clock ms) of keys currently held down on this device.
+    /// Used by the timeline to draw a live, growing bar for the local op's
+    /// in-progress transmission before it finalizes on key-up.
+    @Published public private(set) var liveOwnKeyStarts: [Int64] = []
     @Published public var lagMs: Int64 = 0
     @Published public var breakInEnabled: Bool = false {
-        didSet { UserDefaults.standard.set(breakInEnabled, forKey: Self.breakInDefaultsKey) }
+        didSet {
+            UserDefaults.standard.set(breakInEnabled, forKey: Self.breakInDefaultsKey)
+            if !breakInEnabled {
+                // Drop any in-flight live bars — they're no longer being transmitted.
+                liveOwnKeyStarts.removeAll()
+            }
+        }
     }
+
     /// When true, channel joins set the protocol `Private` flag and the contact
     /// presence scanner also probes with `Private: true`. Hides this client's
     /// rooms from the server's public Rooms list. Defaults to true; toggleable
@@ -52,6 +71,7 @@ public final class VailSession: ObservableObject {
             Task { await client.setPrivate(p) }
         }
     }
+
     @Published public var lastNotice: String?
     @Published public var clientCount: Int = 0
     @Published public var roomDecoderEnabled: Bool = false
@@ -98,21 +118,22 @@ public final class VailSession: ObservableObject {
     private var midiOutput: MIDIOutput?
     private var clientEventTask: Task<Void, Never>?
 
-    // Per-key TX state.
+    /// Per-key TX state.
     private struct KeyState {
         var isDown: Bool = false
         var beginLocalMs: Int64 = 0
     }
+
     private var keyState: [MIDIInput.Key: KeyState] = [
         .straight: KeyState(),
         .dit: KeyState(),
-        .dah: KeyState()
+        .dah: KeyState(),
     ]
     private var stuckKeyTask: Task<Void, Never>?
 
     /// Auto-disable break-in if a key has been down for >10s.
     /// Matches the web client's stuck-key safety.
-    public static let stuckKeyTimeoutMs: Int64 = 10_000
+    public static let stuckKeyTimeoutMs: Int64 = 10000
 
     private static let callsignDefaultsKey = "VailSession.callsign"
     private static let channelDefaultsKey = "VailSession.channel"
@@ -146,31 +167,31 @@ public final class VailSession: ObservableObject {
             : false
 
         // Stored let properties first.
-        self.client = VailClient(callsign: cs, txTone: resolvedTxTone)
-        self.keyer = KeyerEngine()
+        client = VailClient(callsign: cs, txTone: resolvedTxTone)
+        keyer = KeyerEngine()
 
         // didSet does not fire from designated initializer, so these loads do not
         // re-write themselves to UserDefaults.
-        self.callsign = cs
-        self.channel = resolvedChannel
-        self.txTone = resolvedTxTone
-        self.rxDelayMs = resolvedRxDelay
-        self.breakInEnabled = resolvedBreakIn
+        callsign = cs
+        channel = resolvedChannel
+        txTone = resolvedTxTone
+        rxDelayMs = resolvedRxDelay
+        breakInEnabled = resolvedBreakIn
 
-        self.keyerMode = defaults.object(forKey: Self.keyerModeDefaultsKey) != nil
+        keyerMode = defaults.object(forKey: Self.keyerModeDefaultsKey) != nil
             ? defaults.integer(forKey: Self.keyerModeDefaultsKey)
             : MIDIOutput.KeyerMode.straightKey.rawValue
-        self.keyerWPM = defaults.object(forKey: Self.keyerWPMDefaultsKey) != nil
+        keyerWPM = defaults.object(forKey: Self.keyerWPMDefaultsKey) != nil
             ? defaults.integer(forKey: Self.keyerWPMDefaultsKey)
             : 20
-        self.adapterRxFeedbackEnabled = defaults.object(forKey: Self.adapterRxFeedbackDefaultsKey) != nil
+        adapterRxFeedbackEnabled = defaults.object(forKey: Self.adapterRxFeedbackDefaultsKey) != nil
             ? defaults.bool(forKey: Self.adapterRxFeedbackDefaultsKey)
             : false
-        self.privateMode = defaults.object(forKey: Self.privateModeDefaultsKey) != nil
+        privateMode = defaults.object(forKey: Self.privateModeDefaultsKey) != nil
             ? defaults.bool(forKey: Self.privateModeDefaultsKey)
             : true
 
-        self.keyer.localTxToneMIDI = resolvedTxTone
+        keyer.localTxToneMIDI = resolvedTxTone
     }
 
     // MARK: - Lifecycle
@@ -190,14 +211,14 @@ public final class VailSession: ObservableObject {
                     self.handleMIDIEvent(event)
                 }
             }
-            self.midi = m
+            midi = m
         } catch {
             log.error("MIDIInput init failed: \(error.localizedDescription)")
         }
 
         do {
             let out = try MIDIOutput()
-            self.midiOutput = out
+            midiOutput = out
             let mode = MIDIOutput.KeyerMode(rawValue: keyerMode) ?? .straightKey
             let wpm = keyerWPM
             let tone = txTone
@@ -282,7 +303,25 @@ public final class VailSession: ObservableObject {
     }
 
     public func sendChat(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            recordSignal(SignalEvent(
+                callsign: callsign,
+                startLocalMs: Int64(Date().timeIntervalSince1970 * 1000),
+                kind: .chat(text: trimmed),
+                origin: .sent
+            ))
+        }
         Task { await client.sendChat(text) }
+    }
+
+    // MARK: - Signal timeline
+
+    private func recordSignal(_ event: SignalEvent) {
+        signalEvents.append(event)
+        if signalEvents.count > Self.maxSignalEvents {
+            signalEvents.removeFirst(signalEvents.count - Self.maxSignalEvents)
+        }
     }
 
     /// Re-broadcast the adapter wake/config sequence. Use when the adapter is
@@ -295,9 +334,9 @@ public final class VailSession: ObservableObject {
 
     private func handleMIDIEvent(_ event: MIDIInput.Event) {
         let wasDown = keyState[event.key]?.isDown ?? false
-        if event.isDown && !wasDown {
+        if event.isDown, !wasDown {
             handleKeyDown(event)
-        } else if !event.isDown && wasDown {
+        } else if !event.isDown, wasDown {
             handleKeyUp(event)
         }
     }
@@ -320,6 +359,10 @@ public final class VailSession: ObservableObject {
 
         // Local sidetone fires immediately, regardless of break-in.
         keyer.beginTx()
+        // Only show on the timeline when we're actually transmitting.
+        if breakInEnabled {
+            liveOwnKeyStarts.append(event.timestampMs)
+        }
 
         startStuckKeyWatchdog()
     }
@@ -330,6 +373,21 @@ public final class VailSession: ObservableObject {
         keyState[event.key]?.isDown = false
 
         keyer.endTx()
+
+        // Finalize: swap the live bar for a recorded event atomically so the
+        // bar doesn't visually flicker between the two.
+        if let idx = liveOwnKeyStarts.firstIndex(of: begin) {
+            liveOwnKeyStarts.remove(at: idx)
+        }
+
+        if breakInEnabled, durationMs > 0 {
+            recordSignal(SignalEvent(
+                callsign: callsign,
+                startLocalMs: begin,
+                kind: .tone(durationMs: Int(durationMs), midiNote: txTone),
+                origin: .sent
+            ))
+        }
 
         if breakInEnabled, durationMs > 0, durationMs <= UInt16.max {
             Task { [client] in
@@ -365,6 +423,7 @@ public final class VailSession: ObservableObject {
         }
         keyer.endTx()
         keyer.panic()
+        liveOwnKeyStarts.removeAll()
         breakInEnabled = false
         lastNotice = "Stuck key detected. Break-in disabled."
         log.warning("Stuck key — panic")
@@ -375,10 +434,10 @@ public final class VailSession: ObservableObject {
 
     private func handleClientEvent(_ event: VailClient.Event) {
         switch event {
-        case .stateChanged(let s):
+        case let .stateChanged(s):
             connectionState = s
 
-        case .tone(let at, let durationMs, _, let txTone):
+        case let .tone(at, durationMs, fromCallsign, txTone):
             let note = txTone ?? 69
             let playAt = at + Int64(rxDelayMs)
             keyer.scheduleReceivedTone(
@@ -390,26 +449,40 @@ public final class VailSession: ObservableObject {
                 let buzzNote = UInt8(max(0, min(127, note)))
                 Task { await midiOutput?.scheduleBuzz(note: buzzNote, durationMs: durationMs, playAtLocalMs: playAt) }
             }
+            // Show the bar on the timeline at the moment audio actually plays
+            // so it lines up with what the operator hears.
+            recordSignal(SignalEvent(
+                callsign: fromCallsign ?? "?",
+                startLocalMs: playAt,
+                kind: .tone(durationMs: Int(durationMs), midiNote: txTone),
+                origin: .received
+            ))
 
-        case .chat(let text, let cs, let ts):
+        case let .chat(text, cs, ts):
             chatMessages.append(ChatMessage(text: text, callsign: cs, timestampMs: ts))
             // Cap chat history to avoid unbounded growth.
             if chatMessages.count > 500 { chatMessages.removeFirst(chatMessages.count - 500) }
+            recordSignal(SignalEvent(
+                callsign: cs ?? "?",
+                startLocalMs: ts,
+                kind: .chat(text: text),
+                origin: .received
+            ))
 
-        case .roster(let userList, let roomList):
+        case let .roster(userList, roomList):
             users = userList
             if let r = roomList { rooms = r }
             clientCount = userList.count
 
-        case .decoderRoomChanged(let enabled):
+        case let .decoderRoomChanged(enabled):
             roomDecoderEnabled = enabled
 
-        case .ownEcho(let lag, _):
+        case let .ownEcho(lag, _):
             // For v0, show the latest instantaneous lag. Smoothing/averaging
             // is a polish task — see CLAUDE.md §6.
             lagMs = lag
 
-        case .notice(let text):
+        case let .notice(text):
             lastNotice = text
         }
     }
@@ -417,7 +490,7 @@ public final class VailSession: ObservableObject {
     // MARK: - Helpers
 
     private static func generateAnonymousCallsign() -> String {
-        let n = Int.random(in: 1000...9999)
+        let n = Int.random(in: 1000 ... 9999)
         return "anon\(n)"
     }
 }
