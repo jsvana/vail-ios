@@ -13,7 +13,9 @@ struct RosterView: View {
     private enum Segment: String, CaseIterable, Identifiable {
         case connected = "Connected"
         case contacts = "Contacts"
-        var id: String { rawValue }
+        var id: String {
+            rawValue
+        }
     }
 
     private enum Editor: Identifiable {
@@ -23,8 +25,8 @@ struct RosterView: View {
         var id: String {
             switch self {
             case .new: "new"
-            case .prefilled(let cs, _): "prefill-\(cs)"
-            case .edit(let contact): contact.id.uuidString
+            case let .prefilled(cs, _): "prefill-\(cs)"
+            case let .edit(contact): contact.id.uuidString
             }
         }
     }
@@ -64,9 +66,9 @@ struct RosterView: View {
                 switch target {
                 case .new:
                     ContactEditView()
-                case .prefilled(let callsign, let tone):
+                case let .prefilled(callsign, tone):
                     ContactEditView(prefillCallsign: callsign, prefillTxTone: tone)
-                case .edit(let contact):
+                case let .edit(contact):
                     ContactEditView(contact: contact)
                 }
             }
@@ -179,8 +181,12 @@ struct RosterView: View {
 
     private func startScan() {
         var channels = Set<String>()
-        for room in session.rooms where room.users > 0 { channels.insert(room.name) }
-        for room in ChannelPickerView.standardRooms { channels.insert(room) }
+        for room in session.rooms where room.users > 0 {
+            channels.insert(room.name)
+        }
+        for room in ChannelPickerView.standardRooms {
+            channels.insert(room)
+        }
         for contact in contacts.contacts {
             if let preferred = contact.preferredChannel, !preferred.isEmpty { channels.insert(preferred) }
         }

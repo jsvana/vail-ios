@@ -8,12 +8,11 @@ import OSLog
 private let log = Logger(subsystem: "com.jsvana.VailMorse", category: "protocol")
 
 public actor VailClient {
-
     // MARK: - Configuration
 
     /// vailmorse.com is the default. Override for testing or alternative
     /// servers (vail.woozle.org speaks the same JSON protocol family).
-    public var baseURL: URL = URL(string: "wss://vailmorse.com/chat")!
+    public var baseURL: URL = .init(string: "wss://vailmorse.com/chat")!
 
     /// Subprotocol the modern server speaks.
     /// Legacy clients can use "binary.vail.woozle.org" or "json.vail.woozle.org"
@@ -81,7 +80,7 @@ public actor VailClient {
         case disconnected
         case connecting
         case connected
-        case idleDisconnected     // closed for inactivity; will reconnect on next user action
+        case idleDisconnected // closed for inactivity; will reconnect on next user action
         case reconnecting
     }
 
@@ -90,7 +89,7 @@ public actor VailClient {
     public init(callsign: String, txTone: Int = 72) {
         self.callsign = callsign
         self.txTone = txTone
-        (self.eventStream, self.eventContinuation) = Self.makeStream()
+        (eventStream, eventContinuation) = Self.makeStream()
     }
 
     private static func makeStream() -> (AsyncStream<Event>, AsyncStream<Event>.Continuation) {
@@ -146,7 +145,7 @@ public actor VailClient {
     }
 
     public func setTxTone(_ note: Int) {
-        self.txTone = note
+        txTone = note
         Task { try? await sendHello() }
     }
 
@@ -319,8 +318,8 @@ public actor VailClient {
             while !Task.isCancelled {
                 let frame = try await task.receive()
                 let data: Data? = switch frame {
-                case .string(let s): s.data(using: .utf8)
-                case .data(let d): d
+                case let .string(s): s.data(using: .utf8)
+                case let .data(d): d
                 @unknown default: nil
                 }
                 guard let data else { continue }
@@ -421,7 +420,7 @@ public actor VailClient {
         var cursorWireMs = msg.timestamp
         var isTone = true
         for dur in msg.duration {
-            if isTone && dur > 0 {
+            if isTone, dur > 0 {
                 let playAtLocalMs = cursorWireMs + clockOffsetMs
                 eventContinuation.yield(.tone(
                     at: playAtLocalMs,

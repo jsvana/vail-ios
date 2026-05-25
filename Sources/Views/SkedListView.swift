@@ -9,7 +9,9 @@ struct SkedListView: View {
     private enum Segment: String, CaseIterable, Identifiable {
         case upcoming = "Upcoming"
         case history = "History"
-        var id: String { rawValue }
+        var id: String {
+            rawValue
+        }
     }
 
     private enum Editor: Identifiable {
@@ -18,7 +20,7 @@ struct SkedListView: View {
         var id: String {
             switch self {
             case .new: "new"
-            case .edit(let sked): sked.id.uuidString
+            case let .edit(sked): sked.id.uuidString
             }
         }
     }
@@ -54,7 +56,7 @@ struct SkedListView: View {
             NavigationStack {
                 switch target {
                 case .new: SkedEditView()
-                case .edit(let sked): SkedEditView(sked: sked)
+                case let .edit(sked): SkedEditView(sked: sked)
                 }
             }
         }

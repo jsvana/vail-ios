@@ -55,7 +55,7 @@ struct ContactEditView: View {
 
             Section("Notes") {
                 TextField("Notes", text: $notes, axis: .vertical)
-                    .lineLimit(3...6)
+                    .lineLimit(3 ... 6)
             }
         }
         .navigationTitle(editingID == nil ? "New Contact" : "Edit Contact")

@@ -12,6 +12,7 @@ public struct LogEntry: Identifiable, Sendable {
     public enum Level: String, Sendable, CaseIterable {
         case debug, info, notice, warning, error
     }
+
     public let id = UUID()
     public let timestamp: Date
     public let level: Level
@@ -51,11 +52,11 @@ public func appLog(
 ) {
     let logger = Logger(subsystem: "com.jsvana.VailMorse", category: category)
     switch level {
-    case .debug:   logger.debug("\(message, privacy: .public)")
-    case .info:    logger.info("\(message, privacy: .public)")
-    case .notice:  logger.notice("\(message, privacy: .public)")
+    case .debug: logger.debug("\(message, privacy: .public)")
+    case .info: logger.info("\(message, privacy: .public)")
+    case .notice: logger.notice("\(message, privacy: .public)")
     case .warning: logger.warning("\(message, privacy: .public)")
-    case .error:   logger.error("\(message, privacy: .public)")
+    case .error: logger.error("\(message, privacy: .public)")
     }
 
     let entry = LogEntry(

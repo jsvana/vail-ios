@@ -12,7 +12,9 @@ struct SkedEditView: View {
         case once = "Once"
         case daily = "Daily"
         case weekly = "Weekly"
-        var id: String { rawValue }
+        var id: String {
+            rawValue
+        }
     }
 
     private let editingID: UUID?
@@ -52,7 +54,7 @@ struct SkedEditView: View {
         case .daily:
             _recurrenceKind = State(initialValue: .daily)
             _weekdays = State(initialValue: [])
-        case .weekly(let days):
+        case let .weekly(days):
             _recurrenceKind = State(initialValue: .weekly)
             _weekdays = State(initialValue: days)
         }
@@ -114,8 +116,8 @@ struct SkedEditView: View {
                                 addCallsign(contact.callsign)
                             } label: {
                                 Text(contact.name.isEmpty
-                                     ? contact.callsign
-                                     : "\(contact.name) (\(contact.callsign))")
+                                    ? contact.callsign
+                                    : "\(contact.name) (\(contact.callsign))")
                             }
                         }
                     } label: {
@@ -126,7 +128,7 @@ struct SkedEditView: View {
 
             Section("Notes") {
                 TextField("Notes", text: $notes, axis: .vertical)
-                    .lineLimit(3...6)
+                    .lineLimit(3 ... 6)
             }
         }
         .navigationTitle(editingID == nil ? "New Sked" : "Edit Sked")
@@ -163,10 +165,9 @@ struct SkedEditView: View {
     }
 
     private var resolvedChannel: String {
-        let c = useCustomChannel
+        return useCustomChannel
             ? customChannel.trimmingCharacters(in: .whitespacesAndNewlines)
             : channel
-        return c
     }
 
     private var isValid: Bool {

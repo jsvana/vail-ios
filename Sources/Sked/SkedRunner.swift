@@ -14,7 +14,6 @@ private let log = Logger(subsystem: "com.jsvana.VailMorse", category: "sked-runn
 
 @MainActor
 public final class SkedRunner: ObservableObject {
-
     /// A sked awaiting the user's one-tap Join (banner state).
     @Published public private(set) var pendingSked: Sked?
     /// The currently running sked, if any.

@@ -11,7 +11,6 @@ import Foundation
 /// Timestamps are **always in server clock** on the wire. The client
 /// translates to/from local clock using `VailClient.clockOffsetMs`.
 public struct VailMessage: Codable, Equatable, Sendable {
-
     /// Milliseconds since Unix epoch, in server clock.
     public var timestamp: Int64
 
@@ -59,7 +58,7 @@ public struct VailMessage: Codable, Equatable, Sendable {
         duration: [UInt16] = [],
         callsign: String? = nil,
         txTone: Int? = nil,
-        `private`: Bool? = nil,
+        private: Bool? = nil,
         decoder: Bool? = nil,
         text: String? = nil
     ) {
@@ -81,9 +80,9 @@ public struct VailMessage: Codable, Equatable, Sendable {
             self.txTone = txTone
         }
 
-        // Server sends these as lowercase inside UsersInfo arrays even though
-        // the top-level envelope uses uppercase keys. Confirmed against the
-        // wire on 2026-05-21.
+        /// Server sends these as lowercase inside UsersInfo arrays even though
+        /// the top-level envelope uses uppercase keys. Confirmed against the
+        /// wire on 2026-05-21.
         enum CodingKeys: String, CodingKey {
             case callsign
             case txTone
@@ -99,7 +98,7 @@ public struct VailMessage: Codable, Equatable, Sendable {
             self.users = users
         }
 
-        // See UserInfo: server uses lowercase keys inside Rooms arrays.
+        /// See UserInfo: server uses lowercase keys inside Rooms arrays.
         enum CodingKeys: String, CodingKey {
             case name
             case users
@@ -122,11 +121,12 @@ public struct VailMessage: Codable, Equatable, Sendable {
 }
 
 // MARK: - Equality for echo suppression
-extension VailMessage {
+
+public extension VailMessage {
     /// Match against a previously-sent message for echo detection.
     /// Server echoes our own transmissions back; we identify them by
     /// (timestamp, duration) equality.
-    public func isEchoOf(_ sent: VailMessage) -> Bool {
+    func isEchoOf(_ sent: VailMessage) -> Bool {
         timestamp == sent.timestamp && duration == sent.duration
     }
 }

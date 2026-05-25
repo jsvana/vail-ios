@@ -7,8 +7,8 @@
 // posts `.skedJoinRequested` so the app can surface the one-tap Join banner.
 
 import Foundation
-import UserNotifications
 import OSLog
+import UserNotifications
 
 private let log = Logger(subsystem: "com.jsvana.VailMorse", category: "sked-notifier")
 
@@ -59,7 +59,8 @@ public final class SkedNotifier {
     private func syncAsync(skeds: [Sked]) async {
         let settings = await center.notificationSettings()
         guard settings.authorizationStatus == .authorized
-            || settings.authorizationStatus == .provisional else {
+            || settings.authorizationStatus == .provisional
+        else {
             log.debug("Notifications not authorized; skipping schedule")
             return
         }
@@ -99,7 +100,8 @@ public final class SkedNotifier {
             let fireDate = sked.startDate.addingTimeInterval(-lead)
             guard fireDate > Date() else { return [] }
             let comps = calendar.dateComponents(
-                [.year, .month, .day, .hour, .minute, .second], from: fireDate)
+                [.year, .month, .day, .hour, .minute, .second], from: fireDate
+            )
             let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
             let id = Self.idPrefix + sked.id.uuidString
             return [UNNotificationRequest(identifier: id, content: content, trigger: trigger)]
@@ -114,7 +116,7 @@ public final class SkedNotifier {
             let id = Self.idPrefix + sked.id.uuidString
             return [UNNotificationRequest(identifier: id, content: content, trigger: trigger)]
 
-        case .weekly(let days):
+        case let .weekly(days):
             var result: [UNNotificationRequest] = []
             let time = calendar.dateComponents([.hour, .minute, .second], from: sked.startDate)
             for day in days {
@@ -124,7 +126,8 @@ public final class SkedNotifier {
                 var dayTime = time
                 dayTime.weekday = day.rawValue
                 guard let occ = calendar.nextDate(
-                    after: Date(), matching: dayTime, matchingPolicy: .nextTime) else { continue }
+                    after: Date(), matching: dayTime, matchingPolicy: .nextTime
+                ) else { continue }
                 let fire = occ.addingTimeInterval(-lead)
                 let comps = calendar.dateComponents([.weekday, .hour, .minute], from: fire)
                 let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: true)

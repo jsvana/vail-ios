@@ -16,7 +16,6 @@ import OSLog
 private let log = Logger(subsystem: "com.jsvana.VailMorse", category: "midi")
 
 public final class MIDIInput {
-
     public enum Key: Sendable {
         case straight
         case dit
@@ -78,7 +77,7 @@ public final class MIDIInput {
 
     private func connectAllSources() {
         let count = MIDIGetNumberOfSources()
-        for i in 0..<count {
+        for i in 0 ..< count {
             let src = MIDIGetSource(i)
             let result = MIDIPortConnectSource(port, src, nil)
             if result != noErr {
@@ -104,7 +103,7 @@ public final class MIDIInput {
     private func process(packetList: UnsafePointer<MIDIPacketList>) {
         let list = packetList.pointee
         var packet = list.packet
-        for _ in 0..<list.numPackets {
+        for _ in 0 ..< list.numPackets {
             handle(packet: packet)
             packet = withUnsafePointer(to: &packet) { MIDIPacketNext($0).pointee }
         }
@@ -117,7 +116,9 @@ public final class MIDIInput {
 
         var bytes = [UInt8](repeating: 0, count: length)
         withUnsafeBytes(of: packet.data) { rawPtr in
-            for i in 0..<length { bytes[i] = rawPtr[i] }
+            for i in 0 ..< length {
+                bytes[i] = rawPtr[i]
+            }
         }
 
         let status = bytes[0] & 0xF0
@@ -177,7 +178,7 @@ public final class MIDIInput {
         let nowWallMs = Int64(Date().timeIntervalSince1970 * 1000)
 
         // Difference in mach units, converted to nanoseconds.
-        let deltaMach: Int64 = Int64(machTime) - Int64(nowMach)
+        let deltaMach = Int64(machTime) - Int64(nowMach)
         let deltaNs = deltaMach * Int64(timebase.numer) / Int64(timebase.denom)
         let deltaMs = deltaNs / 1_000_000
         return nowWallMs + deltaMs

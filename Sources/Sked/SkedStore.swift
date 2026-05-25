@@ -10,7 +10,6 @@ private let log = Logger(subsystem: "com.jsvana.VailMorse", category: "sked-stor
 
 @MainActor
 public final class SkedStore: ObservableObject {
-
     @Published public private(set) var skeds: [Sked] = []
     @Published public private(set) var history: [SkedRun] = []
 
@@ -58,7 +57,9 @@ public final class SkedStore: ObservableObject {
     public func delete(at offsets: IndexSet) {
         let removed = offsets.map { skeds[$0] }
         skeds.remove(atOffsets: offsets)
-        for sked in removed { notifier.cancel(skedID: sked.id) }
+        for sked in removed {
+            notifier.cancel(skedID: sked.id)
+        }
         persistAndSync()
     }
 
@@ -132,7 +133,8 @@ public final class SkedStore: ObservableObject {
         let fm = FileManager.default
         let dir = (try? fm.url(
             for: .applicationSupportDirectory, in: .userDomainMask,
-            appropriateFor: nil, create: true))
+            appropriateFor: nil, create: true
+        ))
             ?? fm.temporaryDirectory
         return dir.appendingPathComponent("skeds.json")
     }

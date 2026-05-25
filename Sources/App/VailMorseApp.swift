@@ -12,32 +12,34 @@ extension Notification.Name {
 
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(
-        _ application: UIApplication,
-        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+        _: UIApplication,
+        didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
         return true
     }
 
-    // Show reminders even while the app is foregrounded.
+    /// Show reminders even while the app is foregrounded.
     func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification,
+        _: UNUserNotificationCenter,
+        willPresent _: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         completionHandler([.banner, .list, .sound])
     }
 
-    // Route a tapped reminder (or its Join action) to the runner.
+    /// Route a tapped reminder (or its Join action) to the runner.
     func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
+        _: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         if let idString = response.notification.request.content.userInfo["skedID"] as? String,
-           let id = UUID(uuidString: idString) {
+           let id = UUID(uuidString: idString)
+        {
             NotificationCenter.default.post(
-                name: .skedJoinRequested, object: nil, userInfo: ["skedID": id])
+                name: .skedJoinRequested, object: nil, userInfo: ["skedID": id]
+            )
         }
         completionHandler()
     }

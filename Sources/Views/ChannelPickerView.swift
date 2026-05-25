@@ -13,7 +13,7 @@ struct ChannelPickerView: View {
         "Decoder",
         "Echo",
         "Null",
-        "Fortunes"
+        "Fortunes",
     ]
 
     @EnvironmentObject var session: VailSession

@@ -24,7 +24,6 @@ import OSLog
 private let log = Logger(subsystem: "com.jsvana.VailMorse", category: "midi.out")
 
 public actor MIDIOutput {
-
     /// Keyer mode set on the adapter via Program Change. Values match the
     /// Vail adapter firmware (see CLAUDE.md §4).
     public enum KeyerMode: Int, CaseIterable, Sendable {
@@ -63,8 +62,8 @@ public actor MIDIOutput {
         var sidetoneMIDINote: Int = 72 // C5
     }
 
-    nonisolated(unsafe) private var client: MIDIClientRef = 0
-    nonisolated(unsafe) private var port: MIDIPortRef = 0
+    private nonisolated(unsafe) var client: MIDIClientRef = 0
+    private nonisolated(unsafe) var port: MIDIPortRef = 0
     private var destination: MIDIEndpointRef = 0
     private var config = Config()
 
@@ -101,8 +100,8 @@ public actor MIDIOutput {
             throw MIDIOutputError.osStatus("MIDIOutputPortCreate", portStatus)
         }
 
-        self.client = newClient
-        self.port = newPort
+        client = newClient
+        port = newPort
     }
 
     deinit {
@@ -137,7 +136,7 @@ public actor MIDIOutput {
         config.ditDurationMs = Self.ditDurationMs(forWPM: wpm)
         guard destination != 0 else { return }
         send([0xB0, 0x01, UInt8(min(127, config.ditDurationMs / 2))], to: destination)
-        log.info("Set keyer speed \(wpm) WPM (dit \(self.config.ditDurationMs)ms)")
+        log.info("Set keyer speed \(wpm) WPM (dit \(config.ditDurationMs)ms)")
     }
 
     public func setSidetone(midiNote: Int) {
@@ -252,7 +251,8 @@ public actor MIDIOutput {
             // The adapter may appear as "Vail" or as the raw board it's built on
             // (Adafruit QT Py M0). Match either. See CLAUDE.md §4.
             if name.contains("vail") || manufacturer.contains("vail")
-                || name.contains("qt py") || manufacturer.contains("adafruit") {
+                || name.contains("qt py") || manufacturer.contains("adafruit")
+            {
                 return dest
             }
         }
@@ -286,7 +286,9 @@ public actor MIDIOutput {
         packet.timeStamp = timeStamp
         packet.length = UInt16(message.count)
         withUnsafeMutableBytes(of: &packet.data) { raw in
-            for (i, byte) in message.enumerated() { raw[i] = byte }
+            for (i, byte) in message.enumerated() {
+                raw[i] = byte
+            }
         }
 
         var list = MIDIPacketList(numPackets: 1, packet: packet)

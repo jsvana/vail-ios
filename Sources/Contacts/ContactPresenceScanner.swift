@@ -21,7 +21,6 @@ private let log = Logger(subsystem: "com.jsvana.VailMorse", category: "presence-
 
 @MainActor
 public final class ContactPresenceScanner: ObservableObject {
-
     /// callsign (uppercased) → channels the callsign was seen in during the
     /// most recent scan.
     @Published public private(set) var channelsByCallsign: [String: [String]] = [:]
@@ -116,7 +115,7 @@ public final class ContactPresenceScanner: ObservableObject {
         while index < channels.count {
             if Task.isCancelled { break }
             let end = min(index + Self.maxConcurrent, channels.count)
-            let batch = Array(channels[index..<end])
+            let batch = Array(channels[index ..< end])
 
             let results = await withTaskGroup(of: (String, Set<String>).self) { group in
                 for channel in batch {
@@ -131,7 +130,9 @@ public final class ContactPresenceScanner: ObservableObject {
                     }
                 }
                 var acc: [(String, Set<String>)] = []
-                for await result in group { acc.append(result) }
+                for await result in group {
+                    acc.append(result)
+                }
                 return acc
             }
 
@@ -201,8 +202,8 @@ public final class ContactPresenceScanner: ObservableObject {
         while !Task.isCancelled {
             guard let frame = try? await task.receive() else { return [] }
             let data: Data? = switch frame {
-            case .string(let s): s.data(using: .utf8)
-            case .data(let d): d
+            case let .string(s): s.data(using: .utf8)
+            case let .data(d): d
             @unknown default: nil
             }
             guard let data, let msg = try? JSONDecoder().decode(VailMessage.self, from: data) else { continue }
@@ -218,6 +219,6 @@ public final class ContactPresenceScanner: ObservableObject {
     }
 
     private static func anonymousProbeCallsign() -> String {
-        "scan\(Int.random(in: 1000...9999))"
+        "scan\(Int.random(in: 1000 ... 9999))"
     }
 }

@@ -10,7 +10,6 @@ private let log = Logger(subsystem: "com.jsvana.VailMorse", category: "contact-s
 
 @MainActor
 public final class ContactStore: ObservableObject {
-
     @Published public private(set) var contacts: [Contact] = []
 
     private let fileURL: URL
@@ -113,7 +112,8 @@ public final class ContactStore: ObservableObject {
         let fm = FileManager.default
         let dir = (try? fm.url(
             for: .applicationSupportDirectory, in: .userDomainMask,
-            appropriateFor: nil, create: true))
+            appropriateFor: nil, create: true
+        ))
             ?? fm.temporaryDirectory
         return dir.appendingPathComponent("contacts.json")
     }

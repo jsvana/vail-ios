@@ -20,7 +20,6 @@ private let log = Logger(subsystem: "com.jsvana.VailMorse", category: "audio")
 
 @MainActor
 public final class KeyerEngine {
-
     // MARK: - Configuration
 
     /// 5ms attack/release matches the web client's `OscillatorRampDuration`.
@@ -37,7 +36,9 @@ public final class KeyerEngine {
     }
 
     public private(set) var sampleRate: Double = 48000
-    public var lastRenderTime: AVAudioTime? { engine.outputNode.lastRenderTime }
+    public var lastRenderTime: AVAudioTime? {
+        engine.outputNode.lastRenderTime
+    }
 
     // MARK: - Engine
 
@@ -72,7 +73,7 @@ public final class KeyerEngine {
         engine.connect(txGenerator.node, to: mixer, format: monoFormat)
 
         try engine.start()
-        log.info("Audio engine started at \(self.sampleRate) Hz")
+        log.info("Audio engine started at \(sampleRate) Hz")
     }
 
     public func stop() {
@@ -183,7 +184,7 @@ public final class KeyerEngine {
         let amp = Self.masterAmplitude
         let total = Int(frames)
 
-        for i in 0..<total {
+        for i in 0 ..< total {
             var envelope: Float = 1.0
             if i < rampFrames {
                 envelope = Float(i) / Float(rampFrames)
@@ -212,7 +213,6 @@ public final class KeyerEngine {
 /// CW timing this is overkill — the block runs every ~10ms and the lock is
 /// held for microseconds — but it keeps things obviously correct.
 private final class ToneGenerator {
-
     let node: AVAudioSourceNode
 
     var frequency: Double {
@@ -273,7 +273,7 @@ private final class ToneGenerator {
             let omega = 2.0 * .pi * freq / sampleRate
             let twoPi = 2.0 * .pi
 
-            for i in 0..<Int(frameCount) {
+            for i in 0 ..< Int(frameCount) {
                 if gain != target {
                     gain += perSampleStep
                     if (perSampleStep > 0 && gain > target) || (perSampleStep < 0 && gain < target) {
@@ -292,7 +292,7 @@ private final class ToneGenerator {
             lockRef.unlock()
 
             // Mirror to remaining channels if multi-channel.
-            for j in 1..<abl.count {
+            for j in 1 ..< abl.count {
                 let dst = abl[j].mData!.assumingMemoryBound(to: Float.self)
                 memcpy(dst, ptr, Int(frameCount) * MemoryLayout<Float>.size)
             }

@@ -65,7 +65,6 @@ struct ContactDetailView: View {
 
     // MARK: - Presence
 
-    @ViewBuilder
     private var presenceSection: some View {
         Section {
             if scanner.isScanning {
@@ -157,8 +156,12 @@ struct ContactDetailView: View {
 
     private func startScan() {
         var channels = Set<String>()
-        for room in session.rooms where room.users > 0 { channels.insert(room.name) }
-        for room in ChannelPickerView.standardRooms { channels.insert(room) }
+        for room in session.rooms where room.users > 0 {
+            channels.insert(room.name)
+        }
+        for room in ChannelPickerView.standardRooms {
+            channels.insert(room)
+        }
         if let preferred = current.preferredChannel, !preferred.isEmpty { channels.insert(preferred) }
         channels.remove(session.channel)
         scanner.scan(

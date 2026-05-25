@@ -11,8 +11,13 @@ import Foundation
 public enum Weekday: Int, Codable, CaseIterable, Sendable, Identifiable, Comparable {
     case sunday = 1, monday, tuesday, wednesday, thursday, friday, saturday
 
-    public var id: Int { rawValue }
-    public static func < (lhs: Weekday, rhs: Weekday) -> Bool { lhs.rawValue < rhs.rawValue }
+    public var id: Int {
+        rawValue
+    }
+
+    public static func < (lhs: Weekday, rhs: Weekday) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
 
     /// Two-letter label for compact toggles ("Mo", "Tu", …).
     public var shortLabel: String {
@@ -83,7 +88,7 @@ public struct Sked: Identifiable, Codable, Equatable, Sendable {
             let time = calendar.dateComponents([.hour, .minute, .second], from: startDate)
             return calendar.nextDate(after: reference, matching: time, matchingPolicy: .nextTime)
 
-        case .weekly(let days):
+        case let .weekly(days):
             guard !days.isEmpty else { return nil }
             var time = calendar.dateComponents([.hour, .minute, .second], from: startDate)
             var candidates: [Date] = []
@@ -98,13 +103,13 @@ public struct Sked: Identifiable, Codable, Equatable, Sendable {
     }
 
     /// Human-readable recurrence summary, e.g. "Weekly · Mo We Fr".
-    public func recurrenceDescription(calendar: Calendar = .current) -> String {
+    public func recurrenceDescription(calendar _: Calendar = .current) -> String {
         switch recurrence {
         case .once:
             return "Once"
         case .daily:
             return "Daily"
-        case .weekly(let days):
+        case let .weekly(days):
             let ordered = days.sorted().map(\.shortLabel).joined(separator: " ")
             return ordered.isEmpty ? "Weekly" : "Weekly · \(ordered)"
         }
