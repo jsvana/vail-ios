@@ -325,13 +325,14 @@ public actor VailClient {
                 guard let data else { continue }
                 do {
                     let msg = try JSONDecoder().decode(VailMessage.self, from: data)
-                    // Diagnostic: surface tone messages that carry tone data
-                    // but no attributable callsign — those land as "?" in the
-                    // timeline. Logging the raw frame lets us see if the
-                    // server's key naming has drifted again.
-                    if !msg.duration.isEmpty, msg.callsign == nil, msg.text == nil {
+                    // Diagnostic: surface tone messages we can't attribute to
+                    // any operator — neither a Callsign nor a resolvable
+                    // TxTone→roster match. Logging the raw frame lets us see if
+                    // the server's roster/key naming has drifted again.
+                    if !msg.duration.isEmpty, msg.callsign == nil, msg.text == nil,
+                       resolveSender(txTone: msg.txTone, usersInfo: msg.usersInfo) == nil {
                         let preview = String(data: data, encoding: .utf8) ?? "<binary>"
-                        appLog(.warning, "protocol", "tone w/o callsign: \(preview.prefix(240))")
+                        appLog(.warning, "protocol", "unattributable tone: \(preview.prefix(240))")
                     }
                     handle(msg)
                 } catch {
@@ -450,8 +451,15 @@ public actor VailClient {
             return
         }
 
-        // Real transmission from another user. Walk the Duration array,
-        // emitting one .tone event per tone (even-indexed) entry.
+        // Real transmission from another user. Tone messages never carry a
+        // Callsign on the wire — the server forwards them with only Duration
+        // and TxTone. Mirror the web client's identification model and resolve
+        // the sender from the roster (UsersInfo) the server echoes on every
+        // message, so received tones are attributable instead of anonymous.
+        let sender = msg.callsign ?? resolveSender(txTone: msg.txTone, usersInfo: msg.usersInfo)
+
+        // Walk the Duration array, emitting one .tone event per tone
+        // (even-indexed) entry.
         var cursorWireMs = msg.timestamp
         var isTone = true
         for dur in msg.duration {
@@ -460,13 +468,35 @@ public actor VailClient {
                 eventContinuation.yield(.tone(
                     at: playAtLocalMs,
                     durationMs: dur,
-                    fromCallsign: msg.callsign,
+                    fromCallsign: sender,
                     txTone: msg.txTone
                 ))
             }
             cursorWireMs += Int64(dur)
             isTone.toggle()
         }
+    }
+
+    /// Tone messages arrive without a Callsign — only a TxTone. The server
+    /// includes the full roster (UsersInfo: callsign + TxTone) on every
+    /// message, so we attribute a tone to an operator from that snapshot,
+    /// matching how the web client identifies senders.
+    ///
+    /// - A single other operator in the room is unambiguously the sender
+    ///   (the common 1-on-1 QSO case), regardless of TX tone.
+    /// - Otherwise the sender is whoever uniquely uses the tone's TxTone.
+    ///
+    /// Returns nil when the sender genuinely can't be determined — e.g.
+    /// several operators sharing the default tone — so callers can avoid
+    /// asserting a false attribution.
+    private func resolveSender(txTone: Int?, usersInfo: [VailMessage.UserInfo]?) -> String? {
+        guard let usersInfo else { return nil }
+        let others = usersInfo.filter { $0.callsign != callsign }
+        if others.count == 1 { return others.first?.callsign }
+        guard let txTone else { return nil }
+        let toneMatches = others.filter { $0.txTone == txTone }
+        if toneMatches.count == 1 { return toneMatches.first?.callsign }
+        return nil
     }
 
     // MARK: - Helpers

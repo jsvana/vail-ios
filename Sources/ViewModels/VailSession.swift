@@ -527,14 +527,19 @@ public final class VailSession: ObservableObject {
                 let buzzNote = UInt8(max(0, min(127, note)))
                 Task { await midiOutput?.scheduleBuzz(note: buzzNote, durationMs: durationMs, playAtLocalMs: playAt) }
             }
-            // Show the bar on the timeline at the moment audio actually plays
-            // so it lines up with what the operator hears.
-            recordSignal(SignalEvent(
-                callsign: fromCallsign ?? "?",
-                startLocalMs: playAt,
-                kind: .tone(durationMs: Int(durationMs), midiNote: txTone),
-                origin: .received
-            ))
+            // Chart the bar at the moment audio actually plays so it lines up
+            // with what the operator hears. Only do so when we could attribute
+            // the tone to an operator; an unresolvable tone (several operators
+            // sharing one TX tone) still plays audio above, but drawing it in a
+            // catch-all "?" lane would merge distinct senders and mislead.
+            if let sender = fromCallsign {
+                recordSignal(SignalEvent(
+                    callsign: sender,
+                    startLocalMs: playAt,
+                    kind: .tone(durationMs: Int(durationMs), midiNote: txTone),
+                    origin: .received
+                ))
+            }
 
         case let .chat(text, cs, ts):
             chatMessages.append(ChatMessage(text: text, callsign: cs, timestampMs: ts))
