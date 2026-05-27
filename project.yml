@@ -36,8 +36,8 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         CFBundleDisplayName: Vail Morse
-        CFBundleShortVersionString: "1.2"
-        CFBundleVersion: "3"
+        CFBundleShortVersionString: "1.3"
+        CFBundleVersion: "4"
         # Declares the app uses only encryption exempt under US export
         # regulations (TLS via URLSession / WebSocket). Setting this here
         # makes App Store Connect skip the encryption question on every
